@@ -100,3 +100,16 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 21. **The docs research agent suggested allowing `Bash(npm run *)`.** That rule would also have run `npm run push`, which pushes to both remotes, without asking. It was caught before anything was added. The AI then proposed a deny rule for pushes, which would also have blocked pushes the user approved. Pushes go in an ask rule, which prompts every time.
 22. **The same agent suggested a hook that runs tests after every edit.** In test-first work the new test fails on purpose, so the hook would mostly report expected failures. It was dropped.
+
+## 2026-10-06 — M0 skeleton
+
+### What worked
+
+- **Test first, with a deliberate break.** Each health-check case failed before the code existed. The noindex and robots tests were checked by breaking the header and the robots rule on purpose: all three tests failed, then passed once restored.
+- **A clean-clone run.** Copying exactly the files a clone gets into an empty folder showed that `npm run setup` works from scratch (34 s) and that `verify` passes there.
+
+### Where AI misled us or we course-corrected
+
+23. **The AI said today's harness commit was on `docs/problem-space`.** It was on `main`. The AI trusted the git status shown at the start of the session, which was stale, and didn't check the branch before committing. Nothing was pushed. Lesson: run `git branch --show-current` before every commit.
+24. **The AI wrote the placeholder page, `robots.txt` and the noindex header before running their end-to-end test,** so it never saw those tests fail first. It caught this itself and made up for it by breaking each part on purpose and watching the tests fail.
+25. **Neon's onboarding offered a CLI setup (`neon deploy`, `neon skills`, `neon mcp`).** It would have deployed the app to Neon and added unreviewed skills and an MCP server to the repo. It was skipped, because Neon is only the database here and the app runs on Render (D34).

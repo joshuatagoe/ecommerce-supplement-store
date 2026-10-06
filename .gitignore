@@ -3,3 +3,17 @@
 
 # The original brief, kept locally for reference and not published
 docs/PRD.md
+
+# Dependencies and build output
+node_modules
+.next
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment (.env.example is the committed template)
+.env
+.env*.local
+
+# Test output
+playwright-report
+test-results

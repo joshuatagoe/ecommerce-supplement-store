@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D42). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D44). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -739,7 +739,7 @@ src/
     pay/[token]/        page.tsx (six states), events/route.ts (SSE)
     api/health/         route.ts
   server/               business modules; never import Next.js
-    access/ store/ orders/ payments/ reporting/ links/
+    access/ store/ orders/ payments/ reporting/ links/ health.ts
     ports/              payment-gateway.ts, link-sender.ts, patient-directory.ts
     adapters/           stub-payments/ (own file store), log-link-sender.ts, seeded-patients.ts
     db/                 schema.ts, client.ts, notify.ts (LISTEN/NOTIFY)
@@ -747,7 +747,7 @@ src/
   ui/                   components/, tokens.css, fonts/
 instrumentation.ts      starts the sweep (Node runtime only)
 drizzle/                SQL migrations (committed)
-scripts/                seed, reconcile, sweep, verify, push, smoke, drill-outage
+scripts/                setup, migrate, verify, push, check-skills, seed, reconcile, sweep, smoke, drill-outage
 tests/                  golden/, unit/, integration/, e2e/, load/ (k6)
 docs/                   this doc, design/palettes.html, LOAD_TESTS.md
 docker-compose.yml
