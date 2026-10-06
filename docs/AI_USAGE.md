@@ -84,3 +84,19 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 18. **A research agent recommended palette C on looks alone.** The user asked what evidence supported it. The AI found none beyond taste, ran a colour-blindness check that favoured A, and the user chose A, which they had preferred on sight.
 19. **The AI argued against Next.js with an outdated caching claim** and overstated the difficulty of SSE. Checking the docs showed Next.js 16 made caching opt-in. The user knows Next.js, so it was chosen. The one real wrinkle (sharing memory with the startup hook) is avoided with Postgres LISTEN/NOTIFY.
 20. **The AI applied production standards to demo hosting** and recommended $13.30 a month. The user asked whether a sleeping free server really mattered for a demo. It doesn't, as long as the sweep also runs at server start. Hosting is now $0, with the paid setup recorded for production.
+
+## 2026-10-06 — Workflow before implementation
+
+### What worked
+
+- **Reading the past workflow reports first.** Both pointed to due-date surprises, which led to deploying at M0 (D40).
+- **A docs research agent** checked current Claude Code features (permissions, hooks, worktrees, skill discovery) instead of the AI answering from memory.
+
+### What didn't go as expected
+
+- **The project skills weren't being loaded.** Claude Code only finds skills in `.claude/skills/`, and this repo kept them in `.cursor/skills/`. They were followed only because AGENTS.md names them. They are now copied (D41).
+
+### Where AI misled us or we course-corrected
+
+21. **The docs research agent suggested allowing `Bash(npm run *)`.** That rule would also have run `npm run push`, which pushes to both remotes, without asking. It was caught before anything was added. The AI then proposed a deny rule for pushes, which would also have blocked pushes the user approved. Pushes go in an ask rule, which prompts every time.
+22. **The same agent suggested a hook that runs tests after every edit.** In test-first work the new test fails on purpose, so the hook would mostly report expected failures. It was dropped.

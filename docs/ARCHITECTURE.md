@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D38). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D42). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -704,14 +704,14 @@ flowchart LR
 
 | Layer | What runs | What it catches |
 |---|---|---|
-| `npm run verify` | Typecheck, lint, golden cases, unit and property tests, integration tests against the local Postgres, reconciliation on a fresh seed | Most bugs, before anything leaves the laptop |
+| `npm run verify` | Typecheck, lint, golden cases, unit and property tests, integration tests against the local Postgres, reconciliation on a fresh seed, and a check that `.claude/skills/` matches `.cursor/skills/` (D41) | Most bugs, before anything leaves the laptop |
 | `npm run push` | `verify` once, then `git push origin` and `git push gitlab` | A push that skipped the checks, or reached only one remote |
 | GitHub CI | Everything in `verify`, plus Playwright (end-to-end, axe, keyboard) and the README number check | "Works on my machine" problems and accessibility regressions |
 | Branch protection | `main` accepts only merges whose CI passed, admins included | Untested code reaching production |
 | Render health check | A new version gets traffic only after `/api/health` passes | A version that can't start. The old version keeps serving. |
 | `npm run smoke` | Against the live URL: health, a seeded pay link loads, the portal login works. Allows 2 minutes for Render Free to wake. | Production-only mistakes, such as a wrong signing key |
 
-CI runs only on GitHub, and the README links to its runs so graders reading GitLab can find them. Branch protection and the Render health-check path are set up in the deploy milestone, with the user's approval.
+CI runs only on GitHub, and the README links to its runs so graders reading GitLab can find them. The Render deploy and its health-check path are set up in M0, and branch protection in M7, each with the user's approval.
 
 **Demo video:** a slowed-down Playwright script drives the demo (`slowMo`) while the user records and narrates. The slow-approve outage scene runs on the laptop.
 
@@ -757,16 +757,23 @@ docker-compose.yml
 
 Each milestone is a vertical slice with a check that proves it. Cards are seeded on the Notion board only after `grill`. If time runs short, cut from the bottom: the Level 3 test and the outage drill first, then visual polish.
 
+**Deployed from M0 (D40).** The skeleton goes live in M0, so each later milestone is checked on the live URL as it lands instead of first at M7.
+
+**Two lanes (D39).** M0 runs alone. M1's two halves, Pricing and the schema with its tests, run in parallel because they share no files. M1 ends by settling the shared contracts: `schema.ts`, `status.ts` and `schemas.ts`. After that:
+- **The server lane** runs ahead in a git worktree: Orders (Send, links, Cancel order), then Payments (the pay action, the stub, the sweep, the "breaks" rows, the race test), then Reporting and `reconcile`.
+- **The UI lane** runs M2 to M6 in order on the main checkout with the one dev server, and plugs into server code that is already built.
+- **A milestone is Done** only when both halves are in and its check below passes. A change to a shared contract after M1 stops both lanes.
+
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | **Skeleton:** Next.js app, Docker Postgres, Drizzle, health route, `setup`, `verify`, `push`, and GitHub CI | `npm run setup` works from a clean clone, `/api/health` returns 200, and CI is green |
+| M0 | **Skeleton, deployed:** Next.js app, Docker Postgres, Drizzle, health route, `setup`, `verify`, `push`, GitHub CI, and the first deploy to Render and Neon with secrets, noindex and the health check | `npm run setup` works from a clean clone, CI is green, and `/api/health` returns 200 locally and on the live URL |
 | M1 | **Money core:** shared Pricing, golden cases, property tests; the schema with every database rule; integration tests | Every golden and property test passes, and each database rule has a test that shows it refusing bad data |
 | M2 | **Sign in and My store** (F1) | Playwright F1 passes axe and the keyboard run, and out-of-range prices show the USERS.md messages |
 | M3 | **New order to Send** (F2): autosave, quantity, live "You earn", Send, signed links, Copy link, New link, Cancel order, Order again | Playwright F2 passes. A double-clicked Send gives one link. Send against an out-of-range line is refused. |
 | M4 | **Pay** (F3): the six states, the pay action, the stub with test cards, the sweep, SSE with NOTIFY | Every row of the "breaks" table has a passing test. The race test gives exactly one charge. A keyboard-only Pay works. |
 | M5 | **Sales, Order details, reconciliation** (F4, F5): filters, search, headline and footer totals, audit trail | Totals on the seed match reconciliation, and the filters pass end to end |
 | M6 | **Seed history and polish:** months of orders through the real code; visual polish on New order and the pay page (D12); the NVDA pass | `reconcile` is clean on the seed, and axe is clean everywhere |
-| M7 | **Deploy:** Render and Neon, secrets, noindex, health check, branch protection, `smoke` | `npm run smoke` passes against the live URL |
+| M7 | **Production gates:** branch protection on `main`, `smoke` | `npm run smoke` passes against the live URL |
 | M8 | **Load tests and drill**, written up in `docs/LOAD_TESTS.md` | The Level 1 bar is met, and Levels 2–3 and the drill are recorded |
 | M9 | **README, final logs, demo video** | The README's numbers match a fresh CI run, and the video is recorded |
 
@@ -780,7 +787,7 @@ Each milestone is a vertical slice with a check that proves it. Cards are seeded
 - **The last draft save wins.** Two people editing the same draft can overwrite each other.
 - **The sweep needs an always-on server in production.** It runs from Next.js's `instrumentation.ts`, which is documented for monitoring, not background work.
 - **SSE across several servers needs a direct database connection** for LISTEN. Transaction-mode connection poolers don't support it.
-- **Unconfirmed: whether Neon suspends while our LISTEN connection is open.** If it doesn't, the database stays awake while the app is up. That still fits Neon's free compute while Render Free sleeps. Checked at M7.
+- **Unconfirmed: whether Neon suspends while our LISTEN connection is open.** If it doesn't, the database stays awake while the app is up. That still fits Neon's free compute while Render Free sleeps. Checked when M4's SSE is deployed.
 - **The Level 3 load test measures the laptop more than the design.**
 - **The order counts depend on a $100 average order value,** which isn't published anywhere.
 - **The rest of what's cut is in DECISIONS.md:** refunds, real payments, tax, shipping, stock, automatic repeat orders, dark mode, and patient verification.

@@ -20,7 +20,7 @@ When work makes a decision with a trade-off, cuts something, or corrects the AI,
 
 ## Skills
 
-Follow the project skills in `.cursor/skills/`. They replace the personal `plan-implementer` skills here.
+Follow the project skills in `.cursor/skills/`. They replace the personal `plan-implementer` skills here. Claude Code loads the same skills from a copy in `.claude/skills/`. Edit `.cursor/skills/` first, then copy the change. `npm run verify` fails if the copies differ (D41).
 
 - `grill` before a Notion card is seeded, and again before every commit. A skipped grill means no commit.
 - `tdd-plan-implementer` when implementing a slice of the plan

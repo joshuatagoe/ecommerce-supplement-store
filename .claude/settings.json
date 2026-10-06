@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run verify *)",
+      "Bash(npm run test *)",
+      "Bash(npm run setup *)",
+      "Bash(npm run seed *)",
+      "Bash(npm run reconcile *)",
+      "Bash(npm run dev *)",
+      "Bash(npx vitest *)",
+      "Bash(npx playwright *)",
+      "Bash(docker compose *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(npm run push *)",
+      "Bash(git commit *)",
+      "PowerShell(git push *)",
+      "PowerShell(npm run push *)",
+      "PowerShell(git commit *)"
+    ]
+  }
+}
