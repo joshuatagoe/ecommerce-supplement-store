@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Palette preview from the architecture session, 2026-10-06. Palette A was chosen.
+     Open this file in a browser. It loads its two fonts from Google Fonts; the app itself will host them. -->
+<title>Supplement Store Palettes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: one column of comparison sections. Mocks sit in a 3-up grid that stacks at phone width.
+   The page chrome follows the viewer's theme; each mock keeps its candidate palette, which is the thing being judged. */
+:root{
+  --bg:#f4f5f4; --panel:#ffffff; --fg:#1c2124; --muted:#596166; --line:#d8dcdb; --chip:#e8ebea; --ink:#22323a; --bad:#b50909;
+  --sans:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;
+  --patient:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121517;--panel:#1a1e20;--fg:#e3e6e7;--muted:#a2aaae;--line:#2d3336;--chip:#252a2d;--ink:#d3dbde;--bad:#ff8a80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121517;--panel:#1a1e20;--fg:#e3e6e7;--muted:#a2aaae;--line:#2d3336;--chip:#252a2d;--ink:#d3dbde;--bad:#ff8a80;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;line-height:1.55}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:16px;padding-block:36px 72px;display:flex;flex-direction:column;gap:56px}
+h1{font-size:clamp(28px,4vw,40px);line-height:1.1;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:22px;line-height:1.25;margin:0;text-wrap:balance}
+.eyebrow{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 6px}
+.lede{max-width:70ch;color:var(--muted);margin:10px 0 0}
+section{display:flex;flex-direction:column;gap:18px}
+.sec-head{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+.sec-head p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:22px}
+.key{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.key-top{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.key h3{margin:0;font-size:17px}
+.key p{margin:0;color:var(--muted);font-size:15px}
+.sw{display:flex;gap:4px;flex-wrap:wrap}
+.sw span{width:22px;height:22px;border-radius:5px;border:1px solid var(--line)}
+.tag{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--ink);white-space:nowrap}
+.switch{display:flex;flex-wrap:wrap;gap:6px}
+.switch button{font:inherit;font-size:15px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;min-height:36px}
+.switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.switch button:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.col-label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600}
+.phone{border:1px solid var(--line);border-radius:30px;padding:10px;background:var(--panel);width:100%;max-width:392px;margin-inline:auto}
+.screen{border-radius:22px;overflow:hidden}
+.stack{display:flex;flex-direction:column;gap:28px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.ct{border-collapse:collapse;width:100%;min-width:680px;font-variant-numeric:tabular-nums}
+.ct th,.ct td{padding:10px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.ct thead th{font-size:14px;color:var(--muted);font-weight:600}
+.ct tbody tr:last-child td,.ct tbody tr:last-child th{border-bottom:0}
+.ct tbody th{font-weight:400}
+.ct td{white-space:nowrap}
+.dot{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px;border:1px solid var(--line)}
+.verdict{font-size:13px;font-weight:700;margin-left:6px;color:var(--muted)}
+.verdict.fail{color:var(--bad)}
+.fonts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.spec{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.spec .big{font-size:32px;line-height:1.2;margin:0}
+.spec .glyphs{font-size:28px;letter-spacing:.06em;margin:0}
+.spec .meta{color:var(--muted);font-size:14px;margin:0}
+.spec .body{margin:0;max-width:60ch}
+.nums{display:grid;grid-template-columns:auto auto;gap:2px 28px;justify-content:start;font-size:18px;margin:0}
+.nums dd{margin:0;text-align:right}
+.nums dt{color:var(--muted)}
+.note{font-size:14px;color:var(--muted);margin:0}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.ic{width:1em;height:1em;flex:none}
+
+/* ---------- Patient pay page mock ---------- */
+.pp{font-family:var(--patient);font-size:19px;line-height:1.5;background:var(--m-bg);color:var(--m-text);min-height:660px;display:flex;flex-direction:column}
+.pp p{margin:0}
+.pp-banner{background:var(--m-banner-bg);color:var(--m-banner-fg);font-size:15px;font-weight:700;padding:8px 16px;text-align:center}
+.pp-inner{padding:20px 16px 22px;display:flex;flex-direction:column;gap:18px;flex:1}
+.pp-practice{font-size:16px;color:var(--m-muted)}
+.pp-head h3{font-size:24px;line-height:1.25;margin:2px 0 0;font-weight:700;text-wrap:balance}
+.pp-items{list-style:none;margin:0;padding:0}
+.pp-item{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;padding:14px 0;border-top:1px solid var(--m-border);align-items:start}
+.pp-item:last-child{border-bottom:1px solid var(--m-border)}
+.bottle{width:40px;height:54px;display:block}
+.pp-name{font-weight:700;line-height:1.3}
+.pp-meta{color:var(--m-muted);font-size:16px;margin-top:2px}
+.pp-save{color:var(--m-ok);font-size:16px;font-weight:700;margin-top:4px}
+.pp-price{text-align:right;font-variant-numeric:tabular-nums}
+.pp-now{display:block;font-weight:700}
+.pp-was{display:block;color:var(--m-muted);font-size:16px}
+.pp-total{display:flex;justify-content:space-between;align-items:baseline;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.pp-total-save{color:var(--m-muted);font-size:16px;margin-top:-12px}
+.pp-card{border:1px solid var(--m-border);background:var(--m-surface);border-radius:10px;padding:12px 14px 16px;margin:0;display:flex;flex-direction:column;gap:4px;min-width:0}
+.pp-card legend{font-weight:700;display:flex;align-items:center;gap:8px;padding:0 4px}
+.pp-card label{font-size:16px;font-weight:700;margin-top:8px}
+.pp-card input{font:inherit;font-size:18px;padding:10px 12px;border:2px solid var(--m-input);border-radius:6px;background:var(--m-field);color:var(--m-text);min-height:48px;width:100%}
+.pp-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pp-row > div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pp-pay{font:inherit;font-weight:700;font-size:20px;background:var(--m-primary);color:#ffffff;border:2px solid transparent;border-radius:8px;min-height:56px;width:100%;cursor:pointer}
+.pp-pay:hover{background:var(--m-hover)}
+.pp input:focus-visible,.pp button:focus-visible{outline:3px solid var(--m-focus);outline-offset:2px;box-shadow:0 0 0 2px var(--m-focus-fill)}
+.pp-help{font-size:16px;color:var(--m-muted);border-top:1px solid var(--m-border);padding-top:14px;margin-top:auto}
+.pp-state{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:10px;border:1px solid var(--m-border);background:var(--m-surface)}
+.pp-state .ic{font-size:26px;margin-top:2px}
+.pp-state-h{font-weight:700;font-size:21px;line-height:1.3;margin-bottom:4px}
+.pp-state.ok{background:var(--m-ok-bg);border-color:var(--m-ok)} .pp-state.ok .ic,.pp-state.ok .pp-state-h{color:var(--m-ok)}
+.pp-state.info{background:var(--m-info-bg);border-color:var(--m-info)} .pp-state.info .pp-state-h{color:var(--m-info)}
+.pp-state.warn{background:var(--m-warn-bg);border-color:var(--m-warn)} .pp-state.warn .ic,.pp-state.warn .pp-state-h{color:var(--m-warn)}
+.spin{width:26px;height:26px;flex:none;margin-top:2px;border-radius:50%;border:3px solid var(--m-border);border-top-color:var(--m-info);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.pp-receipt{margin:0;display:flex;flex-direction:column;gap:8px;font-size:17px}
+.pp-receipt div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--m-border);padding-bottom:8px}
+.pp-receipt dt{color:var(--m-muted)}
+.pp-receipt dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+
+/* ---------- Provider portal mock ---------- */
+.pt{font-family:var(--sans);font-size:16px;line-height:1.5;background:var(--m-bg);color:var(--m-text);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+.pt p{margin:0}
+.pt-bar{display:flex;flex-wrap:wrap;gap:6px 24px;align-items:center;padding:8px 20px;background:var(--m-surface);border-bottom:1px solid var(--m-border)}
+.pt-brand{font-weight:700}
+.pt-nav{display:flex;gap:2px;flex-wrap:wrap}
+.pt-nav a{padding:8px 10px;color:var(--m-text);text-decoration:none;border-bottom:3px solid transparent}
+.pt-nav a:hover{text-decoration:underline}
+.pt-nav a[aria-current]{font-weight:700;border-bottom-color:var(--m-primary)}
+.pt-nav a:focus-visible{outline:3px solid var(--m-focus);outline-offset:2px}
+.pt-user{margin-left:auto;color:var(--m-muted)}
+.pt-main{padding:20px;display:flex;flex-direction:column;gap:18px}
+.pt-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.pt h4{margin:0;font-size:20px}
+.pt-sub{color:var(--m-muted);font-size:15px}
+.pt-totals{display:flex;flex-wrap:wrap;gap:12px;margin:0}
+.pt-total{background:var(--m-surface);border:1px solid var(--m-border);border-radius:8px;padding:10px 14px;min-width:150px}
+.pt-total dt{font-size:14px;color:var(--m-muted)}
+.pt-total dd{margin:0;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.pt-tablewrap{overflow-x:auto;border:1px solid var(--m-border);border-radius:8px;background:var(--m-surface)}
+.pt table{border-collapse:collapse;width:100%;min-width:760px}
+.pt th{font-size:14px;text-align:left;color:var(--m-muted);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--m-border);white-space:nowrap}
+.pt td{padding:10px 12px;border-bottom:1px solid var(--m-border);vertical-align:middle}
+.pt tbody tr:last-child td{border-bottom:0}
+.pt .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pt .ref{font-variant-numeric:tabular-nums;letter-spacing:.03em;white-space:nowrap}
+.pt .quiet{color:var(--m-muted);font-size:14px;display:block}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 10px 2px 8px;border-radius:999px;font-size:14px;font-weight:700;border:1px solid;white-space:nowrap}
+.badge.ok{background:var(--m-ok-bg);color:var(--m-ok)}
+.badge.info{background:var(--m-info-bg);color:var(--m-info)}
+.badge.warn{background:var(--m-warn-bg);color:var(--m-warn)}
+.badge.plain{background:var(--m-bg);color:var(--m-muted);border-color:var(--m-border)}
+.pt-act{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--m-primary);text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:nowrap}
+.pt-btn{background:var(--m-primary);color:#ffffff;border:2px solid transparent;border-radius:6px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer;min-height:40px}
+.pt-btn:hover{background:var(--m-hover)}
+.pt-ghost{background:var(--m-surface);color:var(--m-primary);border:2px solid var(--m-primary);border-radius:6px;padding:6px 12px;font:inherit;font-weight:700;cursor:pointer;min-height:40px}
+.pt button:focus-visible,.pt input:focus-visible{outline:3px solid var(--m-focus);outline-offset:2px;box-shadow:0 0 0 2px var(--m-focus-fill)}
+.pt-lines{display:flex;flex-direction:column;border:1px solid var(--m-border);border-radius:8px;background:var(--m-surface)}
+.pt-line{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--m-border)}
+.pt-line:last-child{border-bottom:0}
+.pt-line-name{flex:2 1 220px;min-width:0}
+.pt-line-name strong{display:block}
+.pt-field{display:flex;flex-direction:column;gap:4px;flex:0 1 auto}
+.pt-field label{font-size:14px;font-weight:700}
+.pt-field input{font:inherit;padding:6px 10px;border:2px solid var(--m-input);border-radius:6px;background:var(--m-field);color:var(--m-text);min-height:40px;width:118px;font-variant-numeric:tabular-nums}
+.pt-field input.qty{width:56px;text-align:center}
+.pt-field input.is-focus{outline:3px solid var(--m-focus);outline-offset:2px;box-shadow:0 0 0 2px var(--m-focus-fill)}
+.pt-field input.is-error{border-color:var(--m-err)}
+.stepper{display:flex;gap:4px;align-items:center}
+.stepper button{width:40px;height:40px;border:2px solid var(--m-input);border-radius:6px;background:var(--m-field);color:var(--m-text);font:inherit;font-weight:700;cursor:pointer}
+.hint{font-size:14px;color:var(--m-muted)}
+.err{font-size:15px;color:var(--m-err);font-weight:700;display:flex;gap:6px;align-items:flex-start;flex-basis:100%;background:var(--m-err-bg);border-radius:6px;padding:8px 10px}
+.err .ic{margin-top:3px}
+.pt-earn{display:flex;flex-direction:column;flex:1 1 140px;font-variant-numeric:tabular-nums}
+.pt-earn strong{font-size:20px}
+.saved{display:inline-flex;gap:6px;align-items:center;color:var(--m-muted);font-size:14px}
+
+/* ---------- Contrast modes ---------- */
+.viewbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:22px}
+.viewlabel{font-weight:600}
+.viewnote{margin:8px 0 0;max-width:80ch}
+/* Simulated dark contrast theme: system-style black, white, yellow and cyan. */
+.hc .pp-pay,.hc .pt-btn{background:#000000;color:#ffff00;border-color:#ffff00}
+.hc .pt-ghost{background:#000000}
+.hc .pp-banner{border-bottom:2px solid #ffffff}
+.hc .spin{border-color:#ffffff;border-top-color:#00ffff}
+.hc .badge,.hc .pp-state,.hc .err{border:1px solid #ffffff}
+.hc .pt-act{color:#ffff00}
+/* Real Windows contrast themes: the browser swaps every colour, so keep shapes, borders and focus outlines. */
+@media (forced-colors:active){
+  .pp-pay,.pt-btn,.pt-ghost,.stepper button{border:2px solid ButtonText}
+  .pp-state,.badge,.pt-total,.err,.pp-banner{border:1px solid CanvasText}
+  .spin{border-color:GrayText;border-top-color:Highlight}
+  .pp input:focus-visible,.pp button:focus-visible,.pt button:focus-visible,.pt input:focus-visible,.pt-field input.is-focus,.switch button:focus-visible{outline:3px solid Highlight}
+  .switch button[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:2px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Supplement store · visual design</p>
+    <h1>Supplement Store Palettes</h1>
+    <p class="lede">Three palettes from the design research, applied to Sam's pay page and Dr. Rivera's portal. The fonts are the same in all three, so only the colours change. All names, the practice and the phone number are made up, and every amount follows the agreed money rules: a 0.75% fee, rounded up per bottle. We chose A. The research first picked C for its look, and the colour-blindness check below is why we moved.</p>
+    <div class="keys" id="keys"></div>
+    <div class="viewbar">
+      <span class="viewlabel" id="view-label">View the mocks with</span>
+      <div class="switch" role="group" aria-labelledby="view-label" id="modes">
+        <button type="button" data-mode="standard" aria-pressed="true">Standard contrast</button>
+        <button type="button" data-mode="more" aria-pressed="false">More contrast</button>
+        <button type="button" data-mode="hc" aria-pressed="false">High contrast (simulated)</button>
+      </div>
+    </div>
+    <p class="note viewnote">More contrast is what the app switches to when a device asks for it: secondary text turns to body text, and light borders darken. The high-contrast view approximates a dark Windows contrast theme. With a real contrast theme on, the browser replaces every colour itself, and these mocks keep their borders, focus outlines, words and icons. Press Tab inside any phone or portal to walk its keyboard order.</p>
+  </header>
+
+  <section aria-labelledby="h-pay">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-pay">Patient pay page</h2>
+        <p>Atkinson Hyperlegible Next at 19px. Switch between the six states the link can show.</p>
+      </div>
+      <div class="switch" role="group" aria-label="Pay page state" id="states">
+        <button type="button" data-state="checkout" aria-pressed="true">Checkout</button>
+        <button type="button" data-state="confirming" aria-pressed="false">Confirming</button>
+        <button type="button" data-state="paid" aria-pressed="false">Paid</button>
+        <button type="button" data-state="cancelled" aria-pressed="false">No longer available</button>
+        <button type="button" data-state="expired" aria-pressed="false">Expired</button>
+        <button type="button" data-state="invalid" aria-pressed="false">Isn't valid</button>
+      </div>
+    </div>
+    <div class="grid3" id="phones"></div>
+  </section>
+
+  <section aria-labelledby="h-portal">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-portal">Provider portal</h2>
+        <p>Source Sans 3 at 16px. The Sales list, with every order and an action for its status, this month's totals, and two lines from New order: one in range with keyboard focus showing, one rejected.</p>
+      </div>
+    </div>
+    <div class="stack" id="portals"></div>
+  </section>
+
+  <section aria-labelledby="h-contrast">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-contrast">Contrast, computed on this page</h2>
+        <p>WCAG 2.2 ratios for the standard view, rounded down. Text needs 4.5:1. Input borders and focus rings need 3:1.</p>
+      </div>
+    </div>
+    <div class="tablewrap"><table class="ct" id="contrast"></table></div>
+  </section>
+
+  <section aria-labelledby="h-cvd">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-cvd">Colour blindness, computed on this page</h2>
+        <p>How different two colours look, as a CIE76 colour difference, after simulating the two most common types of red-green colour blindness (Machado 2009). Higher is easier to tell apart. Red and green statuses drop from about 100 to between 15 and 27 in every palette, which is why each status also carries a word and an icon.</p>
+      </div>
+    </div>
+    <div class="tablewrap"><table class="ct" id="cvd"></table></div>
+  </section>
+
+  <section aria-labelledby="h-fonts">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-fonts">Fonts</h2>
+        <p>Both are free under the SIL Open Font License and served by Google Fonts. The real app would host them itself, so the pay link is never sent to a font server.</p>
+      </div>
+    </div>
+    <div class="fonts">
+      <div class="spec" style="font-family:var(--patient)">
+        <p class="meta">Patient pay page · Atkinson Hyperlegible Next · 19px body</p>
+        <p class="big">Recommended by Dr. Rivera</p>
+        <p class="glyphs">Il1 O0 rn m 5S 8B</p>
+        <p class="body" style="font-size:19px">Designed by the Braille Institute for readers with low vision. Similar letters and digits are drawn to look different from each other.</p>
+      </div>
+      <div class="spec">
+        <p class="meta">Provider portal · Source Sans 3 · 16px body</p>
+        <p class="big">Sales</p>
+        <dl class="nums">
+          <dt>Sam Okafor</dt><dd>$96.00</dd>
+          <dt>Priya Shah</dt><dd>$64.00</dd>
+          <dt>Jordan Kim</dt><dd>$22.17</dd>
+          <dt>Ana Torres</dt><dd>$34.00</dd>
+        </dl>
+        <p class="body">Its digits are all the same width by default, so prices line up in columns without extra CSS.</p>
+      </div>
+    </div>
+    <p class="note">Research sources: USWDS, NHS and GOV.UK design systems, Baymard Institute checkout studies, Stripe Checkout, and Google Fonts metadata.</p>
+  </section>
+</div>
+
+<script>
+const P = {
+  A: { name: "A · USWDS blue", note: "US Web Design System defaults. Familiar and safe, and it reads as a government service.",
+       primary: "#005ea2", hover: "#1a4480", text: "#1b1b1b", muted: "#565c65", bg: "#ffffff", surface: "#f1f3f6",
+       border: "#dfe1e2", input: "#565c65", focus: "#0076d6", focusFill: "transparent",
+       ok: ["#216e1f", "#ecf3ec"], warn: ["#7a591a", "#faf3d1"], err: ["#b50909", "#f4e3db"], info: ["#2e6276", "#e7f6f8"], banner: ["#1b1b1b", "#ffbe2e"], tag: "Chosen" },
+  B: { name: "B · NHS blue", note: "NHS core colours with a grey page. A calm health look, but borrowed, and its success colour has the thinnest margin.",
+       primary: "#005eb8", hover: "#003087", text: "#212b32", muted: "#4c6272", bg: "#f0f4f5", surface: "#ffffff",
+       border: "#d8dde0", input: "#4c6272", focus: "#212b32", focusFill: "#ffeb3b",
+       ok: ["#007f3b", "#eef6f1"], warn: ["#7a4d00", "#fff4d6"], err: ["#c42417", "#fbeceb"], info: ["#005eb8", "#e8f1f8"], banner: ["#212b32", "#ffb81c"] },
+  C: { name: "C · Mint-cool teal", note: "USWDS mint-cool with warm greys. The calmest and most clinical. The teal sits near the success green, so every status carries a word and an icon.",
+       primary: "#0f6460", hover: "#0b4b3f", text: "#1c1d1f", muted: "#5d5d52", bg: "#f9f9f7", surface: "#ffffff",
+       border: "#e6e6e2", input: "#76766a", focus: "#0f6460", focusFill: "transparent",
+       ok: ["#216e1f", "#e3f5e1"], warn: ["#7a591a", "#fef0c8"], err: ["#b50909", "#fff3f2"], info: ["#07648d", "#e1f3f8"], banner: ["#1c1d1f", "#ffbe2e"], tag: "First research pick" }
+};
+
+const I = {
+  check: '<path d="M3 8.5l3 3 7-7"/>',
+  clock: '<circle cx="8" cy="8" r="6"/><path d="M8 4.8V8l2.4 1.5"/>',
+  pencil: '<path d="M3 13l.9-3.4 7.2-7.2 2.5 2.5-7.2 7.2L3 13z"/>',
+  alert: '<path d="M8 2.6L14.2 13.4H1.8L8 2.6z"/><path d="M8 6.6v3M8 11.6v.1"/>',
+  hourglass: '<path d="M4 2h8M4 14h8M5 2.2c0 3.3 6 2.6 6 5.8s-6 2.5-6 5.8M11 2.2c0 3.3-6 2.6-6 5.8s6 2.5 6 5.8"/>',
+  x: '<circle cx="8" cy="8" r="6"/><path d="M5.9 5.9l4.2 4.2M10.1 5.9l-4.2 4.2"/>',
+  lock: '<rect x="3.5" y="7" width="9" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>',
+  info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.4V11M8 5v.1"/>'
+};
+const icon = n => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
+const bottle = (cap, body, band, label) =>
+  `<svg class="bottle" viewBox="0 0 40 54" role="img" aria-label="${label}"><rect x="12" y="2" width="16" height="8" rx="2" fill="${cap}"/><rect x="8" y="9" width="24" height="43" rx="6" fill="${body}"/><rect x="8" y="21" width="24" height="16" fill="${band}"/><rect x="12" y="26" width="16" height="2.5" rx="1" fill="${body}"/><rect x="12" y="31" width="10" height="2.5" rx="1" fill="${body}"/></svg>`;
+
+let mode = "standard";
+try { if (window.matchMedia && window.matchMedia("(prefers-contrast: more)").matches) mode = "more"; } catch (e) {}
+const HC = { primary: "#ffff00", hover: "#ffff00", text: "#ffffff", muted: "#ffffff", bg: "#000000", surface: "#000000",
+  border: "#ffffff", input: "#ffffff", focus: "#00ffff", focusFill: "transparent", field: "#000000",
+  ok: ["#ffffff", "#000000"], warn: ["#ffffff", "#000000"], err: ["#ffffff", "#000000"], info: ["#ffffff", "#000000"], banner: ["#ffffff", "#000000"] };
+function themed(p) {
+  if (mode === "hc") return Object.assign({}, p, HC);
+  if (mode === "more") return Object.assign({}, p, { muted: p.text, border: p.input });
+  return p;
+}
+const modeClass = () => (mode === "hc" ? " hc" : "");
+
+const vars = p0 => { const p = themed(p0); return [
+  `--m-field:${p.field || "#ffffff"}`, `--m-primary:${p.primary}`, `--m-hover:${p.hover}`, `--m-text:${p.text}`, `--m-muted:${p.muted}`, `--m-bg:${p.bg}`,
+  `--m-surface:${p.surface}`, `--m-border:${p.border}`, `--m-input:${p.input}`, `--m-focus:${p.focus}`, `--m-focus-fill:${p.focusFill}`,
+  `--m-ok:${p.ok[0]}`, `--m-ok-bg:${p.ok[1]}`, `--m-warn:${p.warn[0]}`, `--m-warn-bg:${p.warn[1]}`,
+  `--m-err:${p.err[0]}`, `--m-err-bg:${p.err[1]}`, `--m-info:${p.info[0]}`, `--m-info-bg:${p.info[1]}`,
+  `--m-banner-fg:${p.banner[0]}`, `--m-banner-bg:${p.banner[1]}`
+].join(";"); };
+
+function items(p, compact) {
+  const rows = [
+    { name: "Magnesium Glycinate", size: "120 capsules", qty: 1, now: "$36.00", each: "", was: "$40.00", save: "$4.00", band: p.primary },
+    { name: "Omega-3 Fish Oil", size: "60 softgels", qty: 2, now: "$60.00", each: "$30.00 each", was: "$68.00", save: "$8.00", band: p.info[0] }
+  ];
+  return `<ul class="pp-items">${rows.map(r => `
+    <li class="pp-item">
+      ${bottle(p.text, p.border, r.band, `${r.name}, ${r.size}`)}
+      <div>
+        <p class="pp-name">${r.name}</p>
+        <p class="pp-meta">${r.size} · Qty ${r.qty}${r.each ? ` · ${r.each}` : ""}</p>
+        ${compact ? "" : `<p class="pp-save">You save ${r.save}</p>`}
+      </div>
+      <p class="pp-price"><span class="pp-now">${r.now}</span>${compact ? "" : `<s class="pp-was"><span class="sr">Retail price </span>${r.was}</s>`}</p>
+    </li>`).join("")}</ul>`;
+}
+
+function payPage(k, state) {
+  const p = P[k];
+  const help = `<p class="pp-help">Questions? Call Lakeview Family Practice at 555-010-0142.</p>`;
+  const head = `<header class="pp-head"><p class="pp-practice">Lakeview Family Practice</p><h3>Recommended by Dr. Rivera</h3></header>`;
+  let body;
+  if (state === "checkout") {
+    body = `${head}${items(p, false)}
+      <div class="pp-total"><span>Total</span><span>$96.00</span></div>
+      <p class="pp-total-save">You save $12.00 compared with retail prices.</p>
+      <fieldset class="pp-card"><legend>${icon("lock")} Card details</legend>
+        <label for="cn-${k}">Card number</label><input id="cn-${k}" inputmode="numeric" autocomplete="cc-number" value="4242 4242 4242 4242">
+        <div class="pp-row">
+          <div><label for="ce-${k}">Expiry date</label><input id="ce-${k}" inputmode="numeric" autocomplete="cc-exp" value="08 / 29"></div>
+          <div><label for="cc-${k}">Security code</label><input id="cc-${k}" inputmode="numeric" autocomplete="cc-csc" value="123"></div>
+        </div>
+        <label for="cz-${k}">ZIP code</label><input id="cz-${k}" inputmode="numeric" autocomplete="postal-code" value="97205">
+      </fieldset>
+      <button class="pp-pay" type="button">Pay $96.00</button>${help}`;
+  } else if (state === "confirming") {
+    body = `${head}<div class="pp-state info" role="status"><span class="spin" aria-hidden="true"></span><div><p class="pp-state-h">We're confirming your payment</p><p>You won't be charged twice. This page updates by itself.</p></div></div>
+      ${items(p, true)}<div class="pp-total"><span>Total</span><span>$96.00</span></div>${help}`;
+  } else if (state === "paid") {
+    body = `${head}<div class="pp-state ok" role="status">${icon("check")}<div><p class="pp-state-h">Paid</p><p>We received your payment of $96.00. Keep this page as your receipt.</p></div></div>
+      <dl class="pp-receipt"><div><dt>Order reference</dt><dd>K7Q2-M9XD</dd></div><div><dt>Paid</dt><dd>Oct 6, 2026, 2:41 PM</dd></div><div><dt>Total</dt><dd>$96.00</dd></div></dl>
+      ${items(p, true)}${help}`;
+  } else if (state === "cancelled") {
+    body = `${head}<div class="pp-state">${icon("x")}<div><p class="pp-state-h">This order is no longer available</p><p>Contact Lakeview Family Practice if you still need these items.</p></div></div>${help}`;
+  } else if (state === "expired") {
+    body = `${head}<div class="pp-state warn">${icon("hourglass")}<div><p class="pp-state-h">This link has expired</p><p>Contact Dr. Rivera's clinic for a new one.</p></div></div>${help}`;
+  } else {
+    body = `<div class="pp-state">${icon("info")}<div><p class="pp-state-h">This link isn't valid</p><p>If your provider sent you a newer link, use that one. Otherwise, contact the clinic that sent you this link.</p></div></div>`;
+  }
+  return `<div class="pp${modeClass()}" style="${vars(p)}"><div class="pp-banner">Demo — not a real store. No real payments.</div><div class="pp-inner">${body}</div></div>`;
+}
+
+const ORDERS = [
+  { ref: "K7Q2-M9XD", who: "Sam Okafor", when: "Oct 6", st: ["ok", "check", "Paid"], extra: "", total: "$96.00", earn: "$41.27", act: "Order again" },
+  { ref: "P3MV-8TQA", who: "Priya Shah", when: "Oct 6", st: ["info", "clock", "Sent"], extra: "Expires in 30 days", total: "$64.00", earn: "$29.52", act: "Copy link" },
+  { ref: "D9LC-2RWE", who: "Marcus Lee", when: "Oct 5", st: ["plain", "pencil", "Draft"], extra: "", total: "$52.00", earn: "$25.60", act: "Continue" },
+  { ref: "H4ZN-7KPB", who: "Elena Ruiz", when: "Oct 3", st: ["warn", "alert", "Needs review"], extra: "Confirming a payment", total: "$40.00", earn: "$19.70", act: "" },
+  { ref: "B6RX-5GHU", who: "Ana Torres", when: "Sep 28", st: ["plain", "x", "Cancelled"], extra: "", total: "$34.00", earn: "$16.74", act: "Order again" },
+  { ref: "W8TF-3JDS", who: "Jordan Kim", when: "Sep 2", st: ["plain", "hourglass", "Expired"], extra: "No-profit price", total: "$22.17", earn: "$0.00", act: "New link" }
+];
+
+function portal(k) {
+  const p = P[k];
+  const rows = ORDERS.map(o => `<tr>
+      <td class="ref">${o.ref}</td><td>${o.who}</td><td>${o.when}</td>
+      <td><span class="badge ${o.st[0]}">${icon(o.st[1])}${o.st[2]}</span>${o.extra ? `<span class="quiet">${o.extra}</span>` : ""}</td>
+      <td class="num">${o.total}</td><td class="num">${o.earn}</td>
+      <td>${o.act ? `<button type="button" class="pt-act">${o.act}<span class="sr"> for ${o.ref}</span></button>` : `<span class="quiet">None needed</span>`}</td></tr>`).join("");
+  return `<div class="col"><div class="col-label"><span>${p.name}</span>${p.tag ? `<span class="tag">${p.tag}</span>` : ""}</div>
+  <div class="pt${modeClass()}" style="${vars(p)}">
+    <div class="pt-bar"><span class="pt-brand">Lakeview Family Practice</span>
+      <nav class="pt-nav" aria-label="Portal"><a href="#h-portal" aria-current="page">Sales</a><a href="#h-portal">New order</a><a href="#h-portal">My store</a></nav>
+      <span class="pt-user">Dr. Rivera</span></div>
+    <div class="pt-main">
+      <div class="pt-row"><div><h4>Sales</h4><p class="pt-sub">Every order you've created, newest first, with this month's totals.</p></div><button type="button" class="pt-btn">New order</button></div>
+      <dl class="pt-totals" aria-label="October totals, Pacific time">
+        <div class="pt-total"><dt>October sales</dt><dd>$96.00</dd></div>
+        <div class="pt-total"><dt>You earned</dt><dd>$41.27</dd></div>
+        <div class="pt-total"><dt>Platform fees</dt><dd>$0.73</dd></div>
+      </dl>
+      <div class="pt-tablewrap"><table>
+        <thead><tr><th scope="col">Order</th><th scope="col">Patient</th><th scope="col">Created</th><th scope="col">Status</th><th scope="col" class="num">Total</th><th scope="col" class="num">You earn</th><th scope="col"><span class="sr">Action</span></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <div class="pt-row"><h4>New order for Sam Okafor</h4><span class="saved">${icon("check")}Saved</span></div>
+      <div class="pt-lines">
+        <div class="pt-line">
+          <div class="pt-line-name"><strong>Magnesium Glycinate</strong><span class="hint">120 capsules · Our cost $20.00 · Retail $40.00</span></div>
+          <div class="pt-field"><label for="q1-${k}">Qty</label><div class="stepper"><button type="button" aria-label="Decrease quantity">−</button><input class="qty" id="q1-${k}" inputmode="numeric" value="1"><button type="button" aria-label="Increase quantity">+</button></div></div>
+          <div class="pt-field"><label for="p1-${k}">Price each</label><input id="p1-${k}" class="is-focus" inputmode="decimal" value="$36.00" aria-describedby="h1-${k}"><span class="hint" id="h1-${k}">Allowed $20.16 to $40.00</span></div>
+          <div class="pt-earn" role="status"><span class="hint">You earn</span><strong>$15.73</strong><span class="hint">Patient saves $4.00</span></div>
+          <button type="button" class="pt-ghost">No profit</button>
+        </div>
+        <div class="pt-line">
+          <div class="pt-line-name"><strong>Omega-3 Fish Oil</strong><span class="hint">60 softgels · Our cost $17.00 · Retail $34.00</span></div>
+          <div class="pt-field"><label for="q2-${k}">Qty</label><div class="stepper"><button type="button" aria-label="Decrease quantity">−</button><input class="qty" id="q2-${k}" inputmode="numeric" value="2"><button type="button" aria-label="Increase quantity">+</button></div></div>
+          <div class="pt-field"><label for="p2-${k}">Price each</label><input id="p2-${k}" class="is-error" inputmode="decimal" value="$16.50" aria-invalid="true" aria-describedby="e2-${k}"></div>
+          <div class="pt-earn"><span class="hint">You earn</span><strong>—</strong><span class="hint">Fix the price first</span></div>
+          <button type="button" class="pt-ghost">No profit</button>
+          <p class="err" id="e2-${k}">${icon("alert")}<span><span class="sr">Error: </span>The lowest price for this item is $17.13. Below that you would lose money.</span></p>
+        </div>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+// WCAG 2.x relative luminance and contrast ratio
+function lum(hex) {
+  const v = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+function ratio(a, b) { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+
+const PAIRS = [
+  ["Body text on page background", p => [[p.text, p.bg]], 4.5],
+  ["Body text on panels", p => [[p.text, p.surface]], 4.5],
+  ["Secondary text on page background", p => [[p.muted, p.bg]], 4.5],
+  ["White text on the primary button", p => [["#ffffff", p.primary]], 4.5],
+  ["Primary as link text on page background", p => [[p.primary, p.bg]], 4.5],
+  ["Input border against field and panel", p => [[p.input, "#ffffff"], [p.input, p.surface]], 3],
+  ["Focus ring on page background", p => [[p.focus, p.bg]], 3],
+  ["Success text on its tint", p => [[p.ok[0], p.ok[1]]], 4.5],
+  ["Warning text on its tint", p => [[p.warn[0], p.warn[1]]], 4.5],
+  ["Error text on its tint", p => [[p.err[0], p.err[1]]], 4.5],
+  ["Info text on its tint", p => [[p.info[0], p.info[1]]], 4.5],
+  ["Demo banner text on its fill", p => [[p.banner[0], p.banner[1]]], 4.5]
+];
+
+function contrastTable() {
+  const keys = Object.keys(P);
+  const head = `<thead><tr><th scope="col">Pair</th><th scope="col">Needs</th>${keys.map(k => `<th scope="col">${P[k].name}</th>`).join("")}</tr></thead>`;
+  const body = PAIRS.map(([label, fn, need]) => {
+    const cells = keys.map(k => {
+      const pairs = fn(P[k]);
+      let worst = Infinity, at = pairs[0];
+      pairs.forEach(pr => { const r = ratio(pr[0], pr[1]); if (r < worst) { worst = r; at = pr; } });
+      const shown = (Math.floor(worst * 100) / 100).toFixed(2);
+      const ok = worst >= need;
+      return `<td><span class="dot" style="background:${at[0]}"></span><span class="dot" style="background:${at[1]}"></span>${shown}:1<span class="verdict${ok ? "" : " fail"}">${ok ? "Pass" : "Fail"}</span></td>`;
+    }).join("");
+    return `<tr><th scope="row">${label}</th><td>${need}:1</td>${cells}</tr>`;
+  }).join("");
+  return head + `<tbody>${body}</tbody>`;
+}
+
+function keysHtml() {
+  return Object.keys(P).map(k => {
+    const p = P[k];
+    const sw = [p.primary, p.text, p.bg, p.ok[0], p.warn[0], p.err[0], p.info[0], p.banner[1]]
+      .map(c => `<span style="background:${c}" title="${c}"></span>`).join("");
+    return `<div class="key"><div class="key-top"><h3>${p.name}</h3>${p.tag ? `<span class="tag">${p.tag}</span>` : ""}</div><div class="sw" aria-hidden="true">${sw}</div><p>${p.note}</p></div>`;
+  }).join("");
+}
+
+let state = "checkout";
+function renderPhones() {
+  document.getElementById("phones").innerHTML = Object.keys(P).map(k =>
+    `<div class="col"><div class="col-label"><span>${P[k].name}</span>${P[k].tag ? `<span class="tag">${P[k].tag}</span>` : ""}</div><div class="phone"><div class="screen">${payPage(k, state)}</div></div></div>`).join("");
+}
+
+// Colour-blindness simulation: Machado, Oliveira and Fernandes (2009), severity 1.0, applied in linear RGB.
+const CVD = {
+  "Typical vision": null,
+  "Protanopia": [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+  "Deuteranopia": [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]]
+};
+function linRGB(hex) {
+  return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+}
+function toLab(rgb) {
+  const [r, g, b] = rgb.map(x => Math.min(Math.max(x, 0), 1));
+  const X = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047, Y = 0.2126 * r + 0.7152 * g + 0.0722 * b, Z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+  const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+}
+function simulate(hex, m) { const v = linRGB(hex); return m ? m.map(row => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]) : v; }
+function deltaE(a, b, m) { const x = toLab(simulate(a, m)), y = toLab(simulate(b, m)); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); }
+function cvdTable() {
+  const types = Object.keys(CVD);
+  const head = `<thead><tr><th scope="col">Palette</th><th scope="col">Colours compared</th>${types.map(t => `<th scope="col">${t}</th>`).join("")}</tr></thead>`;
+  const rows = [];
+  Object.keys(P).forEach(k => {
+    const p = P[k];
+    [["Primary and success", p.primary, p.ok[0]], ["Success and error", p.ok[0], p.err[0]]].forEach(([label, a, b]) => {
+      rows.push(`<tr><th scope="row">${p.name}</th><td><span class="dot" style="background:${a}"></span><span class="dot" style="background:${b}"></span>${label}</td>${types.map(t => `<td>${deltaE(a, b, CVD[t]).toFixed(0)}</td>`).join("")}</tr>`);
+    });
+  });
+  return head + `<tbody>${rows.join("")}</tbody>`;
+}
+
+function renderPortals() { document.getElementById("portals").innerHTML = Object.keys(P).map(portal).join(""); }
+function syncPressed(groupId, attr, value) {
+  document.querySelectorAll(`#${groupId} button`).forEach(x => x.setAttribute("aria-pressed", String(x.dataset[attr] === value)));
+}
+
+document.getElementById("keys").innerHTML = keysHtml();
+renderPhones();
+renderPortals();
+syncPressed("modes", "mode", mode);
+document.getElementById("contrast").innerHTML = contrastTable();
+document.getElementById("cvd").innerHTML = cvdTable();
+
+document.getElementById("states").addEventListener("click", e => {
+  const b = e.target.closest("button[data-state]");
+  if (!b) return;
+  state = b.dataset.state;
+  syncPressed("states", "state", state);
+  renderPhones();
+});
+document.getElementById("modes").addEventListener("click", e => {
+  const b = e.target.closest("button[data-mode]");
+  if (!b) return;
+  mode = b.dataset.mode;
+  syncPressed("modes", "mode", mode);
+  renderPhones();
+  renderPortals();
+});
+</script>
+</body>
+</html>

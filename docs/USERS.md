@@ -1,6 +1,6 @@
 # Users
 
-Who this product is for, what they need, and how they move through it. Prices use one running example: a bottle with a $40 retail price that costs us $20. The money model is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md#money-model), and the decisions referenced as D1–D16 are in [DECISIONS.md](DECISIONS.md).
+Who this product is for, what they need, and how they move through it. Prices use one running example: a bottle with a $40 retail price that costs us $20. The money model is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md#money-model), and the decisions referenced as D1–D38 are in [DECISIONS.md](DECISIONS.md). How each flow is built is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Summary
 
@@ -97,7 +97,7 @@ We need to look at any paid order and see exactly where every cent went (PRD req
 | | Patient pays |
 |---|---|
 | Wholesale at cost (today) | ~$20 + shipping, plus ~$5 of the practice's unpaid staff time |
-| **Us** | **$20.15** ($20 cost + $0.15 fee) |
+| **Us** | **$20.16** ($20 cost + $0.16 fee) |
 | Fullscript, full discount | $26 (the provider must register as a seller, with tax ID and bank account) |
 | Fullscript, no-profit default | $36 |
 
@@ -115,23 +115,25 @@ Each flow lists its steps and then what happens when something goes wrong.
 4. Save.
 
 Things that can go wrong:
-- **Price below the lowest price.** Rejected, with the message: "The lowest price for this item is $20.15. Below that you would lose money."
+- **Price below the lowest price.** Rejected, with the message: "The lowest price for this item is $20.16. Below that you would lose money."
 - **Price above retail.** Rejected, with the message: "The highest price is the retail price, $40.00" (D14).
 - **Item removed from the store later.** Orders already sent keep it at the price they were sent with.
 - **Empty store.** New order sends the provider to My store first.
 
 ### F2 — Provider creates an order and sends the link
 
-1. Open **New order** and choose a patient (from the EHR; seeded in the slice).
-2. Pick items from My store. Each starts at the usual price (D10).
-3. Change a price or margin for this patient if needed (D5). Each line shows the price, "You earn", and the saving vs retail. The order shows a total and the provider's total earnings.
-4. Review, then **Send**. The order locks. We create a link with an unguessable code.
-5. The link is "sent" to the patient. Email is stubbed, so the provider can also copy the link.
+1. Open **New order** and choose a patient (from the EHR; seeded in the slice). That patient's recent orders appear with **Order again**, which starts a new draft with the same items, quantities and prices (D31).
+2. Pick items from My store and a quantity of 1–10 for each (D28). Each starts at the usual price (D10).
+3. Change a price or margin for this patient if needed (D5). Each line shows the price, "You earn", and the saving vs retail. The order shows a total and the provider's total earnings. The draft saves itself (D26).
+4. Review, then **Send**. The order locks. We create a signed link that works for 30 days (D25).
+5. The link is "sent" to the patient. Email is stubbed, so the provider can also **Copy link**, from the confirmation or later from Sales.
 
 Things that can go wrong:
 - **Out-of-range price on one line.** That line shows the allowed range, and Send is disabled until it's fixed.
-- **Double-clicking Send.** Exactly one order is created.
-- **Mistake after sending.** A sent order can't be edited. Proposed for the architecture step: the provider can cancel an unpaid order and create a new one.
+- **Double-clicking Send.** One order and one link. Both clicks return the same link.
+- **Pulled away mid-order.** The draft has saved itself. Continue it from Sales.
+- **Mistake after sending.** A sent order can't be edited. The provider can **Cancel order** while no payment is in progress, then use **Order again** to rebuild it with the fix.
+- **Link lost or forwarded to the wrong person.** **New link** turns the old link off and starts a fresh 30 days.
 - **Catalog or store price changes after sending.** The sent order keeps its prices.
 
 ### F3 — Patient pays
@@ -144,23 +146,26 @@ Things that can go wrong:
 Things that can go wrong:
 - **Card declined.** A plain message: nothing was charged, try another card. The order stays unpaid.
 - **Double-clicking Pay, or two tabs.** Only one payment can succeed (enforced on the server, not just by disabling the button).
-- **Unclear result** (e.g. timeout). The patient sees "We're confirming your payment" and the order goes to **needs review**. It is never retried automatically as a new charge.
+- **Unclear result** (e.g. timeout, or any failure we can't explain). The patient sees "We're confirming your payment. Don't pay again. This page updates by itself." The order goes to **needs review**, and the page updates on its own once the payment is confirmed (D23, D24). It is never retried automatically as a new charge.
 - **Link reopened after payment.** "Already paid", with the receipt.
-- **Cancelled order.** "This order is no longer available. Please contact your provider."
-- **Wrong or made-up link.** A generic "not found" page that reveals nothing about other orders.
+- **Cancelled order.** "This order is no longer available. Contact [the practice] if you still need these items."
+- **Link older than 30 days.** "This link has expired. Contact Dr. [name]'s clinic for a new one."
+- **Replaced, broken or made-up link.** "This link isn't valid. If your provider sent you a newer link, use that one. Otherwise, contact the clinic that sent you this link." It reveals nothing, not even whether the order exists (D25).
 
 Privacy:
 - The link contains no product names or patient details.
-- The page shows only this order.
+- The page shows only this order, and not the patient's name (D30).
 
 ### F4 — Provider checks Sales
 
-1. Open **Sales**. See orders with patient, date, status in words (Sent, Paid, Needs review, Cancelled), total, and "You earned".
-2. See this month's totals: sales, earnings, and fees.
-3. Open any order to see its details (F5).
+1. Open **Sales**. See every order created, with patient, date, status in words (Draft, Sent, Needs review, Paid, Expired, Cancelled), total, "You earned", and the action for that status: Continue, Copy link, New link, Order again, or Cancel order (D31).
+2. See this month's totals by paid date: sales, earnings, and fees. These ignore the filters.
+3. Search by patient name or order reference. Filter by status, or by a date range on the created, sent, or paid date. A row under the list adds up the paid orders shown.
+4. Open any order to see its details (F5).
 
 Edge cases:
 - **No orders yet.** An empty state that links to New order.
+- **Nothing matches the filters.** "No orders match. Clear filters."
 - **Other providers' orders.** Never shown.
 
 ### F5 — Audit a paid order

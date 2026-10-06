@@ -9,6 +9,10 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 - **Explore subagents** for web research, run in parallel with WebSearch and WebFetch. Each finding was labeled CONFIRMED (primary source), SECONDARY, or UNCONFIRMED.
 - **Repo harness skills** in `.cursor/skills/`, including `grill` before every commit.
 - **Notion** as the status board.
+- **General-purpose research subagents** (2026-10-06) for scale, traffic timing, US market size, visual design guidance, and hosting. Each ran in the background and used the same confidence labels.
+- **The `plan-creator` skill** to shape the architecture.
+- **A private preview page** (a Claude artifact) comparing the candidate palettes. A copy is in [design/palettes.html](design/palettes.html).
+- **Small Python and Node scripts** to check claims instead of asserting them: money examples, contrast ratios, colour-blindness differences, and diagram alignment.
 
 ## 2026-10-05 — Problem space
 
@@ -41,3 +45,42 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 ### Where AI misled us or we course-corrected
 
 11. **The AI saved the agreed problem space as a new `docs/ARCHITECTURE.md`.** It followed AGENTS.md's rule that the plan lives there. But the session wasn't meant to start the architecture, and the file took the name the architecture session should create from scratch. The user caught it after the commit. Correction: renamed to `docs/PROBLEM_SPACE.md`, and `ARCHITECTURE.md` is left for the architecture step. Lesson: put a phase's output in a file named for that phase, and flag any plan step that touches the next phase's files before the plan is approved.
+
+## 2026-10-06 — Architecture
+
+### What worked
+
+- **Research before deciding.** Five parallel research agents changed decisions:
+  - **Scale:** the target came from Fullscript's published numbers (about 20k orders a day, 10M requests a day on one Rails app), not a guess.
+  - **Hosting:** the research showed which free tiers break which requirement.
+  - **Design:** fonts and palettes came from public design systems.
+- **Computing instead of asserting:**
+  - Scripts checked every money example under the round-up rule ($20.00 → $20.16 lowest price, 2 × $36.10 → 56¢ fee).
+  - The preview page computes its own contrast ratios and colour-blindness differences.
+  - The colour-blindness check reversed a palette recommendation.
+- **A visual preview** let the user judge palettes on a mock pay page and portal instead of from hex codes.
+- **Holding open questions and asking them in one batch** kept the discussion moving.
+- **The user's own ideas improved the design:**
+  - SSE for the confirming page.
+  - Signed pay links ("if we double click, don't we hash both and get the same result?").
+  - One Sales list with Order again.
+  - Quantity per line.
+  - Local checks before every push, like an eval set.
+  - Keeping the load tests to show scale was thought through.
+  - Asking for screen-reader, keyboard and high-contrast support.
+
+### What didn't go as expected
+
+- **Remote push addresses.** The user assumed every push went to both GitHub and GitLab. A `git branch -vv` check showed every push had gone only to GitHub. Adding GitLab as a second push address was blocked by Claude Code's permission check (it treats repointing a remote as risky). The user chose explicit pushes to each remote instead.
+
+### Where AI misled us or we course-corrected
+
+12. **The AI put an invented fact in a research prompt.** It asked the research agent to verify a "2022 Snowflake/Hambro" Fullscript funding round. No such round exists; the 2021 round was led by HGGC and Snapdragon. Lesson: research prompts ask open questions and don't plant "facts" to confirm.
+13. **The AI proposed a 500 ms response-time target with no source.** The user asked why 500 ms. Sources found afterwards supported it: NN/g's 1-second limit, web.dev's 800 ms "good" time to first byte, and Lighthouse's 600 ms. The doc now states the reasoning.
+14. **The AI changed its mind twice on storing pay-link tokens.** It proposed hashing them. It then said hashing meant "we could never show the link again" and reversed. The user questioned that, and it was a trade-off, not a blocker. The user's intuition led to signed links, which keep the benefits of both. Lesson: present trade-offs as trade-offs.
+15. **The AI said the "approved, then our save fails" case couldn't be demoed.** The user asked why. A slow-approve test card, plus stopping the local database during its pause, shows the real failure without a "break the code" switch.
+16. **The AI framed login as "cookie versus token".** The user pointed out JWT. JWT is a token format and a cookie is where it's kept, so the design uses a JWT inside an HttpOnly cookie.
+17. **The AI turned the user's "recent orders" request into separate Orders and Sales pages.** The user reconsidered, and they became one list with Order again.
+18. **A research agent recommended palette C on looks alone.** The user asked what evidence supported it. The AI found none beyond taste, ran a colour-blindness check that favoured A, and the user chose A, which they had preferred on sight.
+19. **The AI argued against Next.js with an outdated caching claim** and overstated the difficulty of SSE. Checking the docs showed Next.js 16 made caching opt-in. The user knows Next.js, so it was chosen. The one real wrinkle (sharing memory with the startup hook) is avoided with Postgres LISTEN/NOTIFY.
+20. **The AI applied production standards to demo hosting** and recommended $13.30 a month. The user asked whether a sleeping free server really mattered for a demo. It doesn't, as long as the sweep also runs at server start. Hosting is now $0, with the paid setup recorded for production.

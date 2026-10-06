@@ -4,7 +4,7 @@ Read this file completely before changing the repo. Then read the plan. Explore 
 
 ## Sources of truth
 
-Design lives in the plan markdown in this repo. Look, in order, for a plan already named in the conversation, then `ARCHITECTURE.md`, `PLAN.md`, `IMPLEMENTATION_PLAN.md`, and `ROADMAP.md` (repo root or `docs/`). None of those exist yet. The agreed problem space is in [docs/PROBLEM_SPACE.md](docs/PROBLEM_SPACE.md), with users and UX flows in [docs/USERS.md](docs/USERS.md); read both before writing the plan. Do not invent product behavior, a stack, or an architecture.
+Design lives in the plan markdown in this repo. Look, in order, for a plan already named in the conversation, then `ARCHITECTURE.md`, `PLAN.md`, `IMPLEMENTATION_PLAN.md`, and `ROADMAP.md` (repo root or `docs/`). The plan is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The agreed problem space is in [docs/PROBLEM_SPACE.md](docs/PROBLEM_SPACE.md), with users and UX flows in [docs/USERS.md](docs/USERS.md); read both before writing the plan. Do not invent product behavior, a stack, or an architecture.
 
 The plan records design. Do not tick its checkboxes as status, and do not restate it into a new document.
 

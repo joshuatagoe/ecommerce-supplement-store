@@ -1,0 +1,786 @@
+# Architecture
+
+How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
+
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D38). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+
+Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
+
+## Contents
+
+1. [Summary](#1-summary)
+2. [Scale and availability](#2-scale-and-availability)
+3. [System overview](#3-system-overview)
+4. [Order lifecycle](#4-order-lifecycle)
+5. [The Pay flow](#5-the-pay-flow)
+6. [Pay links](#6-pay-links)
+7. [Data model](#7-data-model)
+8. [Data flows and API contracts](#8-data-flows-and-api-contracts)
+9. [Frontend](#9-frontend)
+10. [Security and privacy](#10-security-and-privacy)
+11. [Observability](#11-observability)
+12. [Stack and hosting](#12-stack-and-hosting)
+13. [Testing and delivery](#13-testing-and-delivery)
+14. [Configuration](#14-configuration)
+15. [Repository layout](#15-repository-layout)
+16. [Build order](#16-build-order)
+17. [Known limitations](#17-known-limitations)
+
+## 1. Summary
+
+- **One Next.js app server and one PostgreSQL database.** The server is written in TypeScript and keeps no state between requests. The market leader serves this whole market with a single Rails application, so splitting services would buy nothing at our scale.
+- **Money is integer cents, with the split frozen when the order is sent.** The database refuses any line whose cost, fee and margin don't add up to its price.
+- **The payment step saves before it charges.** A failure at any point leaves something we can find and settle, never money taken with no record. A database rule makes a second charge for the same order impossible.
+- **Built and load-tested for the market leader's volume.** That's about 20,000 orders a day, or about 3 orders a second at the busiest hour. The path to the whole US market is written down, not built.
+- **Stubbed:** payments, login, email, the EHR patient list, and payouts. Each sits behind a port with a clean seam ([§3](#stubs-and-seams)).
+
+## 2. Scale and availability
+
+### How big it can get
+
+Researched 2026-10-06. Sources are [listed below](#scale-sources). "Busiest hour" multiplies the average by 6–10×, combining weekday clinic hours (98% of visits are on weekdays) with seasonal demand (immune supplements sell 2.27× more in winter than in summer). Shopify's Black Friday peak minute is about 7× its yearly average.
+
+| Level | Patients | Orders a day | Average | Busiest hour |
+|---|---|---|---|---|
+| **1. The market leader's volume today** (Fullscript, our estimate) | ~5M a year, 125k providers | ~20k (12k–30k) | 1 order every ~4 s | **~3 a second** |
+| 2. Every US patient who buys through a practitioner | 5–11M | 165k–250k | 2–3 a second | ~20–30 a second |
+| 3. Every US supplement user, ordering monthly | ~200M | ~6.6M | ~77 a second | ~500–800 a second |
+
+**We build and test for Level 1 (D18).** The demo runs far below it.
+
+Each order writes about 10–15 rows: the order, its lines, its status events, and its payment attempt. At Level 2's busiest hour that is about 300–450 row writes a second, which one Postgres server handles comfortably. At Level 3 it is about 12,000 a second, which needs the changes in the scaling path below.
+
+Fullscript's engineering blog reports 10M web requests a day in 2023, served by one Rails application on two MySQL databases and one Postgres database. That works out to about 5 orders per provider per month, so each provider's Sales data stays small.
+
+### Traffic patterns that matter
+
+| Pattern | Effect | Design response |
+|---|---|---|
+| **The same order at the same moment:** a double-clicked Pay, two tabs, a link sent twice | A correctness risk at any scale | The Pay flow's guards ([§5](#three-guards-against-a-double-charge)) |
+| **Many links sent at once** | 20%+ of emails are opened in the first hour, which could mean 20–100× normal traffic for that hour | We have no bulk send. Rule: if reminders are added later, spread them out. The pay page is one lookup by link. |
+| **Weekday middays and seasonal peaks** | 6–10× the average hour | The Level 1 load test runs at this rate |
+| **Sales totals** | The most expensive query per page load, though small per provider | Indexes on provider plus date ([§7](#indexes)). Platform-wide totals and reconciliation run as commands, not on page load. |
+| **Evenings and weekends** | 15–27% of patient payments happen when offices are closed | No downtime window. Production migrations must not take the site offline. |
+| **US time zones** | The busy window runs from 9am Eastern to 5pm Pacific, about 11 hours | Spreads the peak. Monthly totals use a stated time zone ([§8](#sales-list-search-filters-and-totals)). |
+
+### Scaling path
+
+| | **Level 1 (built)** | Level 2 | Level 3 |
+|---|---|---|---|
+| Busiest hour | ~3 orders/s | ~20–30 orders/s | ~500–800 orders/s |
+| App server | 1 copy | Several copies behind a load balancer | Many copies |
+| Database | One Postgres | Add a read-only copy for Sales and reports. Precompute monthly totals. | Split orders into monthly tables (partitions). Spread practices across several databases. Move reporting to its own store. |
+| Background work | The sweep runs on a timer inside the app | The sweep holds an advisory lock so only one copy runs it. Link sends go through a queue and are spread out. | A queue for payment results and link sends |
+| SSE updates | Postgres LISTEN/NOTIFY | Same, since any copy can notify any other | A message bus |
+
+**What we do now so these steps don't need a rewrite:**
+- The app keeps nothing in memory between requests.
+- Every provider query filters by provider. Each provider belongs to a practice, which gives Level 3 a natural key for splitting the data.
+- Timestamps are UTC, and the sent and paid times are indexed, which makes monthly partitions possible later.
+- Reporting only reads.
+- External calls go through ports.
+- Status changes are announced through LISTEN/NOTIFY from day one.
+
+### Availability
+
+- **Backups, no standby (D19).** In production, the database would be a managed Postgres with point-in-time restore. A standby copy that takes over automatically is the next step if the 99.9% target matters.
+- **The demo has free-tier limits.** Neon Free keeps a 6-hour restore window, and the seed rebuilds all demo data.
+- **The design fails safely.** If the database is down, a provider's save fails with a message. Pay fails *before* any charge, because the attempt must be saved first. Paid orders are safe as long as the data survives.
+- **Target: 99.9%,** about 43 minutes of downtime a month, measured over clinic hours. Fullscript reports 99.999%, about 5 minutes a year.
+
+### Response time
+
+**Target: during the Level 1 load test, 95% of requests finish on our server within 500 ms.** Three sources support it:
+1. **Nielsen Norman Group:** a response within 1 second keeps "the user's flow of thought" unbroken ([NN/g](https://www.nngroup.com/articles/response-times-3-important-limits/)).
+2. **Google's web.dev:** a time to first byte of 0.8 s or less is "good" for 75% of visits. That time includes DNS, connecting, and redirects ([web.dev](https://web.dev/articles/ttfb)).
+3. **Lighthouse:** fails a page when the server takes more than 600 ms to respond ([Chrome docs](https://developer.chrome.com/docs/lighthouse/performance/server-response-time)).
+
+500 ms stays under Lighthouse's limit, leaves about 300 ms of the 800 ms for a slow phone network, and holds for 95% of requests rather than 75%. On a laptop the network adds almost nothing, so the test measures our server alone. The payment stub answers instantly. A real Pay also waits on the payment company, which this target doesn't include.
+
+### Load tests
+
+All load tests run on the user's laptop, with **k6**. Results go in a report, `docs/LOAD_TESTS.md` (D18).
+
+Each simulated order makes the requests a real one would:
+- **Provider:** start the order, autosave twice, send.
+- **Patient:** open the pay page, pay.
+- **Sales:** one page load for every five orders.
+
+| Test | What it does | Pass bar |
+|---|---|---|
+| **Same-order race** | 50 Pays at once on one order, mixing repeated and new Pay keys; 20 Sends at once on one draft | Exactly one charge reaches the stub, and exactly one link. This also runs in CI. |
+| **Level 1** | ~3 orders/s for 10 minutes | **Must pass:** no errors, 95% of server time under 500 ms, reconciliation clean afterwards |
+| **Level 2** | ~30 orders/s | Record the result and the first thing that slows down |
+| **Level 3** | ~800 orders/s | Expected to fail. On a laptop it mostly measures the laptop, and the report says so. It shows where the Level 3 changes become necessary. |
+| **Database outage drill** | Stop the database partway through the Level 1 test, then restart it | No double charges, no paid order lost, and reconciliation clean afterwards. Pay requests made during the outage fail with a clear message. |
+
+### Scale sources
+
+- **Fullscript:**
+  - 125,000 providers and 5M+ patients a year (April 2026). A September 2026 release says 10M; the two conflict.
+  - $1B+ revenue in 2025.
+  - 250k orders a month in about 2021, per a vendor case study.
+  - 10M requests a day in 2023 ([builders.fullscript.com](https://builders.fullscript.com/posts/fullscript-engineering-2023-wrapped)).
+  - A Rails monolith with MySQL and Postgres ([rubyonrails.org](https://rubyonrails.org/2025/8/6/fullscript-joins-rails-foundation)).
+- **US market:**
+  - 341.8M people (Census V2025).
+  - 60.2% of adults used a supplement in the past 30 days ([CDC NHANES](https://www.cdc.gov/nchs/products/databriefs/db561.htm)), and 75% in the past year (CRN 2024).
+  - The practitioner channel is about $6–6.8B a year (Nutrition Business Journal 2025–2026).
+- **Traffic timing:**
+  - NAMCS weekend visits: 2.0%.
+  - Patientco: 27% of payments made after hours.
+  - Shopify BFCM 2024: about 9 database reads per write.
+  - SPINS: immune supplement seasonality.
+- **Average order value:** no public figure, so **$100 is assumed.** Every order count above depends on it.
+
+## 3. System overview
+
+```mermaid
+flowchart TB
+  provider["Provider (browser)"] -->|"JWT cookie"| portal["Provider portal<br/>Sales · New order · Order details · My store"]
+  patient["Patient (phone)"] -->|"signed link"| pay["Pay page<br/>one order, six states"]
+  portal --> access
+  pay --> access
+  subgraph app["Next.js app server: one deployable, keeps no state between requests"]
+    access["Access<br/>provider session, or link signature"]
+    store["Store<br/>catalog, My store, usual prices"]
+    orders["Orders<br/>the only code that changes an order's status"]
+    payments["Payments<br/>attempts, Pay keys, the sweep"]
+    reporting["Reporting<br/>read only"]
+    pricing["Pricing<br/>pure money math, shared with the browser"]
+    ports["Ports<br/>payment gateway · link sender · patient directory"]
+    access --> store
+    access --> orders
+    access --> payments
+    access --> reporting
+    store --> pricing
+    orders --> pricing
+    payments --> orders
+    payments --> ports
+    orders --> ports
+  end
+  app --> db[("PostgreSQL<br/>its rules are the last line of defense")]
+  ports --> stubs["Stubs now, real services later"]
+```
+
+### Modules
+
+| Module | Owns | Rules |
+|---|---|---|
+| **Access** | Who is calling: a provider from the JWT cookie, or one order from a pay-link signature | Every provider query filters by that provider. A link opens exactly one order. |
+| **Store** | The catalog, My store, and usual prices | Prices are checked by Pricing. Removing an item never touches a sent order. |
+| **Orders** | Drafts, lines, Send, New link, Cancel order, Order again, and **every status change** | Changing an order means locking its row first. Each change writes an audit event in the same transaction and announces itself through NOTIFY. |
+| **Payments** | Payment attempts, Pay keys, and the sweep | Saves the attempt before charging. Asks Orders to mark an order paid, and never sets the status itself. |
+| **Reporting** | The Sales list, totals, Order details, and the reconciliation check | Read only |
+| **Pricing** | Fee, margin, lowest price, price from margin, and the range check | Pure functions on integer cents, with no reads or writes. The same module runs in the browser. |
+| **Ports** | `PaymentGateway`, `LinkSender`, `PatientDirectory` | The only way out to external services |
+
+The business modules live in `src/server/` and **never import Next.js.** Next.js routes and server actions only pass requests to them. That keeps them testable without a browser and leaves a clean seam if they ever move into their own service.
+
+### Stubs and seams
+
+The PRD asks us to say what's stubbed.
+
+| Stubbed | In the slice | Real version plugs in at |
+|---|---|---|
+| **Payments** | A stub payment company. Test card numbers choose the outcome ([§5](#test-cards-and-demo-timings)). It keeps its own records in a separate file, never in our database. | `PaymentGateway.charge` and `lookup`. A Stripe Connect-style charge that later transfers the margin to the provider. Card details go straight to the payment company and never touch our server. |
+| **Login** | Pick a provider from a list. The result is a real signed JWT in an HttpOnly cookie. | The identity service vouches for the provider, and the same cookie carries it (D32) |
+| **Email and SMS** | Send is recorded as an audit event, and the provider copies the link | `LinkSender.send`. The subject line never contains product names. |
+| **EHR patient list** | Seeded patients for each practice | `PatientDirectory.search` |
+| **Payouts** | Earnings are worked out from paid orders | A payouts table and a job that transfers the margin |
+
+## 4. Order lifecycle
+
+```mermaid
+stateDiagram-v2
+  state "Needs review" as NeedsReview
+  [*] --> Draft: Start order (or Order again)
+  Draft --> Draft: Edit (saves itself)
+  Draft --> Sent: Send
+  Draft --> Cancelled: Discard draft
+  Sent --> Sent: New link
+  Sent --> Paid: Pay approved
+  Sent --> NeedsReview: No clear answer from the payment company
+  NeedsReview --> Paid: Sweep finds the charge
+  NeedsReview --> Sent: Sweep finds no charge
+  Sent --> Cancelled: Cancel order (no payment in progress)
+  Paid --> [*]
+  Cancelled --> [*]
+```
+
+**Paid** and **Cancelled** are final. Refunds would later add statuses after Paid.
+
+**Two statuses are worked out, not stored:**
+- **Expired:** the order is sent and its link expiry has passed.
+- **Payment in progress:** the order has a pending attempt.
+
+| Move | Who | Allowed when | Provider sees | Patient sees |
+|---|---|---|---|---|
+| → **Draft** | Provider picks a patient, or clicks **Order again** on a past order | My store has at least one item. The patient is in the provider's practice. | The draft saves itself as they work | Nothing yet, because there's no link |
+| Draft → Draft | Provider edits | Always. Out-of-range prices are saved too, so no work is lost. | "Saving…", "Saved", or "Not saved, retrying". An out-of-range line shows the allowed range, and Send is disabled. | — |
+| Draft → **Sent** | **Send** | At least one line, and every price in range against **today's** cost and retail price | "Sent to Sam", with the link and **Copy link**. The order locks. | The link works |
+| Draft → **Cancelled** | **Discard draft** | Always | "Draft discarded" | — |
+| Sent → Sent | **New link** | No payment in progress | A new link. The old link stops working, and the 30 days restart. | The old link shows "isn't valid" |
+| Sent → **Paid** | Patient's Pay, or the sweep | The Pay flow | "Paid. You earned $15.73." | Receipt |
+| Sent → **Needs review** | System | The payment company gave no clear answer | "Needs review. We're confirming a payment; nothing for you to do." | "We're confirming your payment" |
+| Needs review → Paid or Sent | The sweep | Charged, or confirmed not charged | Paid, or back to Sent | Receipt, or "Your payment didn't go through. You haven't been charged." |
+| Sent → **Cancelled** | **Cancel order** | No payment in progress | "Order cancelled" | "This order is no longer available" |
+| Sent, after 30 days | Time | — | "Expired", with New link and Cancel order | "This link has expired" |
+
+Two staff editing the same draft is out of scope; the last save wins. Each action keeps one verb throughout: Send becomes "Sent", Cancel order becomes "Order cancelled", and Discard draft becomes "Draft discarded".
+
+## 5. The Pay flow
+
+**The core problem:** two systems have to agree on whether Sam paid $36.00, our database and the payment company, and no single transaction can update both. Every rule below exists so that a failure at any point leaves something we can find and settle. It must never leave money taken with no record, and it must never charge twice (D21–D24).
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant P as Sam's phone
+  participant S as App server
+  participant D as PostgreSQL
+  participant G as Payment company (stub)
+  P->>S: Pay(link token, Pay key K1, card)
+  S->>D: Lock the order row. Is it sent, unexpired, with no live attempt?
+  S->>D: Save attempt A1 for K1, status pending, amount 3600. Commit.
+  S->>G: Charge 3600 cents, idempotency key A1
+  G-->>S: Approved, charge ch_123
+  S->>D: One transaction: A1 succeeded, order paid, audit entry, NOTIFY
+  S-->>P: Paid, with receipt
+```
+
+1. **The browser sends the link token, a Pay key, and the card.** It never sends the amount.
+   - **Link token:** identifies the order ([§6](#6-pay-links)).
+   - **Pay key K1:** generated when the page was built and sent in a hidden form field, so Pay also works without JavaScript.
+   - **Card:** stubbed. In the real version it goes straight to the payment company.
+2. **The order row is locked** and the order is checked: sent, not expired, and no live attempt.
+3. **The attempt is saved as pending before any money moves.** This is the key rule. If we charged first and then crashed before saving, Sam would be charged with no record, would pay again, and would be charged $72.00.
+4. **The charge uses the attempt's own ID** as the payment company's idempotency key. Payment companies remember these keys (Stripe for at least 24 hours), so repeating a charge with the same key returns the first result instead of charging again.
+5. **Recording success is one transaction** made of conditional writes:
+
+```sql
+BEGIN;
+UPDATE payment_attempts SET status = 'succeeded', charge_ref = 'ch_123', settled_by = 'request', settled_at = now()
+ WHERE id = :a1 AND status = 'pending';                       -- must change exactly 1 row
+UPDATE orders SET status = 'paid', paid_at = now(), paid_attempt_id = :a1
+ WHERE id = :order AND status IN ('sent', 'needs_review');    -- must change exactly 1 row
+INSERT INTO order_events (order_id, kind, actor_type, at) VALUES (:order, 'paid', 'patient', now());
+SELECT pg_notify('order_status', :ref);
+COMMIT;  -- if either UPDATE changed 0 rows: ROLLBACK
+```
+
+The `WHERE` conditions stop the same approval being recorded twice. That can happen when Sam's original request is slow to finish and the sweep reaches the same attempt at the same moment. Whichever commits first wins, and the other changes 0 rows and rolls back.
+
+### Every place it can break
+
+| It breaks at… | Database shows | Sam sees | How it's settled |
+|---|---|---|---|
+| Steps 2–3 (database down) | Nothing | "We couldn't take your payment. You haven't been charged." | Nothing to settle |
+| Between steps 3 and 4 (server crash) | A1 pending, no charge | An error. On reload: "We're confirming your payment." | The sweep asks about A1: never seen. A1 becomes *failed*, and Sam can pay again. |
+| Step 4, declined | A1 declined | "Your card was declined. You haven't been charged." | Nothing to settle. The page builds a new Pay key. |
+| Step 4, no answer (timeout) | A1 pending, order **needs review** | "We're confirming your payment." | The sweep asks about A1. Charged: paid. Not charged: A1 fails and the order goes back to sent. |
+| Step 5 fails after approval | A1 pending, order sent. The money was taken. | "We're confirming your payment." | The sweep finds ch_123 and records step 5 |
+| Step 6, the reply is lost | Paid | Spinner or error. On reload: "Already paid", with the receipt. | Nothing to settle |
+
+### The sweep
+
+- **When it runs:** every `SWEEP_EVERY_MS`, **and once when the server starts.** It runs inside the app, started from `instrumentation.ts` on the Node runtime only, and needs a server that stays running.
+- **What it checks:** attempts that have been pending longer than `SWEEP_AFTER_MS`, a threshold kept longer than the payment timeout.
+- **What it does with each:** **asks** the payment company about it (`lookup`, never a second `charge`), then settles it with the same conditional writes, recording `settled_by = 'sweep'`.
+- **When it can't settle one:** the order stays in needs review for a person.
+- **Level 2:** a Postgres advisory lock lets only one app copy run each sweep.
+
+### Three guards against a double charge
+
+| Situation | Guard | Enforced by |
+|---|---|---|
+| **The same request twice:** a double click, or the browser retrying after a network blip | K1 is already saved, so the server returns K1's result | A unique index on `payment_attempts.idempotency_key` |
+| **Two requests for one order:** two tabs, two phones | At most one attempt per order can be pending or succeeded. The second gets "payment in progress" and never reaches the payment company. | The order-row lock, plus the partial unique index `one_live_attempt_per_order` |
+| **Anything else (a bug)** | An order becomes paid only from sent or needs review, and only one attempt per order can succeed | The conditional updates above, plus that index and the paid-attempt foreign key ([§7](#database-rules)) |
+
+The index alone already stops two charges, because the second save is refused before any charge is made. The lock is for checks that span the order and its attempts, most of all **Cancel order**. Without the lock, a cancel and a Pay could each pass their checks at the same moment, and Sam would be charged for a cancelled order. Cancel order and New link take the same lock. The lock is per order, so it never slows down anyone else's order.
+
+### What the patient sees
+
+**An unexplained failure always shows "confirming", never "declined" (D23).** The two possible mistakes cost very different amounts:
+- **Wrongly saying "confirming":** the page corrects itself within seconds.
+- **Wrongly saying "declined":** Sam might pay another way and spend $72.00, or dispute a charge that was real.
+
+| The pay action returns | Sam sees |
+|---|---|
+| `paid` | Receipt |
+| `declined` (the payment company said so) | "Your card was declined. You haven't been charged. Try another card." |
+| `not_charged` (we know nothing was charged, such as a failure before the attempt was saved) | "We couldn't take your payment. You haven't been charged. Please try again in a few minutes." |
+| `in_progress` (another tab) | "We're confirming your payment." |
+| `confirming`, a timeout, a network error, a server error, or an unreadable reply | **"We're confirming your payment. Don't pay again. This page updates by itself."** |
+
+While confirming, the page listens on SSE (`/pay/[token]/events`):
+- **The first event is the current status,** so a reconnect never misses a result.
+- **A heartbeat goes out every 15 s.**
+- **The stream closes after 5 minutes.** The page then says: "Still confirming. You won't be charged twice. You can close this page and reopen your link later."
+- **Updates arrive through Postgres NOTIFY,** so they reach the right connection whichever server copy holds it (D24).
+
+### Test cards and demo timings
+
+The stub reads the outcome from the card number, the way Stripe's test mode does. These cards exist only in the stub, which is wired in only when `PAYMENTS_MODE=stub`.
+
+| Card | The stub… | Shows in the demo |
+|---|---|---|
+| 4242 4242 4242 4242 | approves at once | The normal path |
+| 4000 0000 0000 0002 | declines at once | The decline message, then a retry |
+| 4000 0000 0000 0101 | charges, then stays silent past our timeout | Needs review, then the sweep, then Paid |
+| 4000 0000 0000 0200 | stays silent and doesn't charge | Needs review, then the sweep, then "didn't go through", then Pay again |
+| 4000 0000 0000 0309 | charges, waits `STUB_SLOW_APPROVE_MS` (shorter than our timeout), then approves | With the local database stopped during the pause, step 5 fails for real, and the sweep repairs it once the database is back |
+
+The slow-approve demo is recorded on the laptop, because the hosted database can't be stopped on camera. Automated tests cover the same case by making the step 5 write fail.
+
+## 6. Pay links
+
+**Signed links (D25).** A link looks like `/pay/K7Q2-M9XD.<signature>`:
+- **The order ref** (`K7Q2-M9XD`) is 8 random characters from an alphabet without 0, O, 1, I or L. It appears in links, portal URLs, and the receipt. Because it's random, it reveals nothing about how many orders exist.
+- **The signature** is `HMAC-SHA256(LINK_SIGNING_KEY, "<ref>:<link_version>")`, cut to 128 bits and base64url-encoded. The server recomputes it and compares the two with `timingSafeEqual`, so the check takes the same time whether a link is close to valid or not.
+- **The database stores no secret.** Copy link works at any time, and a double-clicked Send returns the same link.
+- **New link** raises `link_version` by one, which makes every older signature fail, and restarts the 30 days.
+- **Changing `LINK_SIGNING_KEY` turns off every live link.** That's the cost of this design, and we accept it.
+
+**Expiry.** A link can start a payment for **30 days** after it's sent. A payment already in progress still settles after that. Expired is worked out on the fly, not stored.
+
+**What a link shows:**
+
+| Signature check | Order state | Page |
+|---|---|---|
+| Passes | Sent | Checkout |
+| Passes | Payment in progress, or needs review | "We're confirming your payment" |
+| Passes | Paid | "Already paid", with the receipt |
+| Passes | Cancelled | "This order is no longer available. Contact Lakeview Family Practice if you still need these items." |
+| Passes | Expired | "This link has expired. Contact Dr. Rivera's clinic for a new one." |
+| **Fails** (replaced by New link, broken, made up, or signed with an old key) | — | **"This link isn't valid. If your provider sent you a newer link, use that one. Otherwise, contact the clinic that sent you this link."** HTTP 404. Reveals nothing, not even whether the order exists. |
+
+Links never appear in logs, and the pay page sends no `Referer` header. Product names never appear in a link or an email subject.
+
+## 7. Data model
+
+```mermaid
+erDiagram
+  practices ||--o{ providers : has
+  practices ||--o{ patients : has
+  providers ||--o{ store_items : sells
+  catalog_items ||--o{ store_items : "listed as"
+  providers ||--o{ orders : creates
+  patients ||--o{ orders : "is for"
+  orders ||--o{ order_lines : contains
+  catalog_items ||--o{ order_lines : "copied into"
+  orders ||--o{ payment_attempts : "paid by"
+  orders ||--o{ order_events : "audited by"
+  orders |o--o{ orders : "ordered again as"
+```
+
+All money is **integer cents**. Every timestamp is `timestamptz`, stored in UTC.
+
+| Table | One row is | Columns |
+|---|---|---|
+| **practices** | A clinic | `id`, `name`, `time_zone` (IANA, e.g. `America/Los_Angeles`) |
+| **providers** | A clinician | `id`, `practice_id`, `display_name` ("Dr. Rivera") |
+| **patients** | A patient (seeded, standing in for the EHR) | `id`, `practice_id`, `first_name`, `last_name`, `email`. Minimal, and never logged. |
+| **catalog_items** | A product we stock | `id`, `brand`, `name`, `size_label`, `image_path`, `image_alt`, `cost_cents`, `msrp_cents`, `active` |
+| **store_items** | An item in a provider's My store | `provider_id`, `catalog_item_id`, `usual_price_cents`, `updated_at`. The primary key is the pair. |
+| **orders** | One order for one patient | `id`, `ref` (unique), `provider_id`, `practice_id`, `patient_id`, `source_order_id` (from Order again), `status`, `link_version`, `link_expires_at`, `fee_rate_bps`, `total_cents`, `cost_cents`, `fee_cents`, `margin_cents`, `paid_attempt_id`, `created_at`, `sent_at`, `paid_at`, `cancelled_at`, `updated_at` |
+| **order_lines** | One product on an order | `id`, `order_id`, `catalog_item_id`, `quantity` (1–10), `unit_price_cents`, `frozen_at`. **Frozen at Send:** `unit_cost_cents`, `fee_rate_bps`, `unit_fee_cents`, `unit_margin_cents`, `unit_msrp_cents`, `product_name`, `image_path`, `image_alt` |
+| **payment_attempts** | One try at paying | `id` (also the payment company's idempotency key), `order_id`, `idempotency_key` (the page's Pay key), `amount_cents`, `status` (`pending`, `succeeded`, `declined`, `failed`), `charge_ref`, `settled_by` (`request` or `sweep`), `created_at`, `settled_at` |
+| **order_events** | One audit entry | `id`, `order_id`, `kind`, `actor_type` (`provider`, `patient`, `sweep`, `system`), `actor_id`, `at`, `details` (`jsonb`, never patient data) |
+
+**Not in our database:**
+- **The payment stub's records** live in their own file, so stopping our database doesn't wipe the payment company's memory.
+- **Sessions** are a signed cookie.
+- **Secrets** are environment variables.
+- **Payouts** are a later table.
+
+### The money rules
+
+These implement D17, D28 and D4.
+
+- **Per bottle:** `fee = ceil(price × fee_rate_bps / 10000)`, computed in integers as `(price × 75 + 9999) ÷ 10000` and rounded down. `margin = price − cost − fee`.
+- **A line:** each per-bottle amount × quantity. Two bottles at $36.10 have a fee of 2 × 28¢ = 56¢ and earn $31.64.
+- **Lowest price:** the smallest price whose margin is at least zero. A $20.00 cost gives a lowest price of **$20.16**, because at $20.15 the fee rounds up to 16¢ and the margin would be −1¢.
+- **Highest price:** the MSRP (D14).
+- **Price or margin entry:** if the provider types a margin, Pricing finds the price, then recomputes the margin from that price (D5).
+
+Sam's line after Send:
+
+| Column | Value | Source |
+|---|---|---|
+| `quantity` | 1 | Dr. Rivera |
+| `unit_price_cents` | 3600 | Dr. Rivera |
+| `unit_cost_cents` | 2000 | Copied from the catalog at Send |
+| `fee_rate_bps` | 75 | Copied from config at Send |
+| `unit_fee_cents` | 27 | ceil(3600 × 75 / 10000) |
+| `unit_margin_cents` | 1573 | 3600 − 2000 − 27 |
+| `unit_msrp_cents` | 4000 | Copied, so "you save $4.00" never changes |
+| `product_name`, `image_*` | "Magnesium Glycinate, 120 capsules" | Copied, so renaming the product later changes nothing |
+
+### Database rules
+
+The database refuses these even if our code has a bug:
+
+| Rule | Implemented as | Stops |
+|---|---|---|
+| Money is whole cents and never negative | Integer columns with `CHECK (… >= 0)` | Fractions and negative amounts |
+| A frozen line adds up | `CHECK (frozen_at IS NULL OR unit_cost_cents + unit_fee_cents + unit_margin_cents = unit_price_cents)` | Cents that don't add up |
+| A frozen line's fee is right | `CHECK (frozen_at IS NULL OR unit_fee_cents = (unit_price_cents * fee_rate_bps + 9999) / 10000)` | Wrong fee arithmetic |
+| A frozen line is in range | `CHECK (frozen_at IS NULL OR (unit_margin_cents >= 0 AND unit_price_cents <= unit_msrp_cents))` | Prices below the lowest or above MSRP |
+| A frozen line never changes | A trigger rejects `UPDATE` and `DELETE` once `frozen_at` is set | Changing a sent order |
+| Order totals add up and never change after Send | `CHECK` on the four totals, plus a trigger | Totals drifting from what Sam saw |
+| One live attempt per order | `CREATE UNIQUE INDEX one_live_attempt_per_order ON payment_attempts (order_id) WHERE status IN ('pending','succeeded')` | Double charges |
+| Each Pay key is used once | A unique index on `idempotency_key` | A double click making two attempts |
+| Paid means a real payment | `CHECK ((status = 'paid') = (paid_attempt_id IS NOT NULL AND paid_at IS NOT NULL))`, plus `FOREIGN KEY (id, paid_attempt_id) REFERENCES payment_attempts (order_id, id)` | "Paid" without a payment for this order |
+| A success has a charge reference | `CHECK (status <> 'succeeded' OR charge_ref IS NOT NULL)` on attempts | A success we can't trace |
+| Status and timestamps agree | `CHECK` on the status list. Non-draft, non-cancelled orders have `sent_at`. Cancelled orders have `cancelled_at`. | Impossible states |
+| Each product appears once per order | `UNIQUE (order_id, catalog_item_id)` | Duplicate lines (use quantity instead) |
+| Quantity is 1–10 | `CHECK (quantity BETWEEN 1 AND 10)` | A typo that orders 100 bottles |
+| The audit trail is append-only | A trigger rejects `UPDATE` and `DELETE` on `order_events` | Rewriting history |
+
+**The reconciliation check** (`npm run reconcile`) covers what the database can't express:
+- Every paid order's totals equal the sum of its lines.
+- Every paid order has exactly one succeeded attempt, and its amount equals the order total.
+- No unpaid order has a succeeded attempt.
+- No attempt has been pending longer than the sweep allows.
+
+It prints "Every paid order adds up", or a list of problems.
+
+### Indexes
+
+- `orders (provider_id, created_at DESC)`, `(provider_id, sent_at DESC)`, and `(provider_id, paid_at DESC)`, for the Sales list and monthly totals.
+- `payment_attempts (created_at) WHERE status = 'pending'`, for the sweep.
+- Patient names are searched only within one practice. At Level 2 they would get a trigram index (`pg_trgm`).
+
+## 8. Data flows and API contracts
+
+Every write below happens in **one transaction**. "Access" means the provider's JWT, or the signature on a link. The browser never sends an amount, except the price a provider types. The server checks that price and recomputes everything from it.
+
+| Action | Browser sends | Server path | Writes | Returns |
+|---|---|---|---|---|
+| Sign in (fake) | provider | Access | — (sets the cookie) | Redirect to Sales |
+| Set a usual price | item, price | Access → Store → Pricing | `store_items` | The saved price, "You earn", the saving |
+| Start an order / Order again | patient, or the past order's ref | Access → Orders | `orders` (draft), `order_lines` (copied), event | Order ref |
+| Edit a draft (autosave) | lines: item, quantity, price or margin | Access → Orders → Pricing | `order_lines`, event "price changed" | Each line's split, with out-of-range lines flagged |
+| **Send** | ref | Access → Orders: lock the order, check every line against today's cost and MSRP, freeze the lines, set totals and fee rate, `link_version = 1`, expiry = now + 30 days | lines, order, events "sent" and "link sent", NOTIFY | Signed link |
+| New link | ref | Access → Orders: lock, require no live attempt | order, event, NOTIFY | New link |
+| Cancel order / Discard draft | ref | Access → Orders: lock, require no live attempt | order, event, NOTIFY | New status |
+| Open a pay link | token | Access (signature) → Orders | — | One of the six states |
+| **Pay** | token, Pay key, card | [§5](#5-the-pay-flow) | attempt, order, events, NOTIFY | An outcome |
+| Status stream | token | Access → LISTEN | — | SSE events |
+| Sweep | — | Payments → `PaymentGateway.lookup` → Orders | attempt, order, events, NOTIFY | — |
+| Sales | filters | Access → Reporting | — | Rows, headline totals, and footer totals |
+| Order details | ref | Access → Reporting | — | Lines with their split, totals, and the audit trail |
+| Reconcile, seed, sweep (commands) | — | Reporting; Store, Orders and Payments with the clock set back | seed: everything | A report |
+
+### Contracts
+
+Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, message, field? } }`. Messages are written for the user, in the wording [USERS.md](USERS.md) gives.
+
+**Provider portal** (needs the JWT cookie; every query is limited to that provider):
+
+| Server action | Input | Success | Error codes |
+|---|---|---|---|
+| `signIn` | `providerId` | Sets the cookie | `UNKNOWN_PROVIDER` |
+| `saveStoreItem` | `catalogItemId`, `usualPriceCents` | `{ item, split }` | `PRICE_BELOW_LOWEST`, `PRICE_ABOVE_RETAIL` |
+| `removeStoreItem` | `catalogItemId` | `{}` | — |
+| `searchPatients` | `text` | `[{ id, name }]` from the provider's practice | — |
+| `startOrder` | `patientId` or `fromOrderRef` | `{ ref }` | `PATIENT_NOT_IN_PRACTICE`, `STORE_EMPTY` |
+| `saveDraft` | `ref`, `lines: [{ catalogItemId, quantity, priceCents }` or `{ …, marginCents }]` | `{ lines: [{ …split, rangeError? }], totals }` | `ORDER_NOT_DRAFT`, `QUANTITY_OUT_OF_RANGE`, `ITEM_NOT_IN_STORE` |
+| `sendOrder` | `ref` | `{ link, expiresAt }`. If the order is already sent, returns the same link. | `ORDER_EMPTY`, `LINES_OUT_OF_RANGE` (with the lines) |
+| `newLink` | `ref` | `{ link, expiresAt }` | `PAYMENT_IN_PROGRESS`, `ORDER_NOT_SENT` |
+| `cancelOrder` | `ref` | `{ status: 'cancelled' }` | `PAYMENT_IN_PROGRESS`, `ORDER_FINAL` |
+| `searchOrders` | `text?`, `status?`, `dateField` (`created`, `sent` or `paid`), `from`, `to`, `cursor?` | `{ rows, footerTotals, nextCursor }` | — |
+
+**Patient** (no login; the link signature is the credential):
+
+| Route or action | Contract |
+|---|---|
+| `GET /pay/[token]` | Server-rendered page in one of the six states ([§6](#6-pay-links)). Failed signature: 404 and the "isn't valid" page. |
+| `pay` (server action, posted by a `<form>`, so it works without JavaScript) | Input `token`, `payKey`, `card`. Returns `{ outcome: 'paid' \| 'declined' \| 'not_charged' \| 'in_progress' \| 'confirming' }`. |
+| `GET /pay/[token]/events` | `text/event-stream`. `event: status` with `data: {"state": "paid"}`. The first event is the current state. A `: ping` every 15 s. Closes after 5 minutes. |
+
+**Operations:**
+- `GET /api/health` returns `200 { ok: true, db: "up", migrations: "current" }`, or 503.
+- Commands: `npm run setup`, `seed`, `reconcile`, `sweep`, `verify`, `verify:full`, `push`, `smoke`, `load:l1`, `load:l2`, `load:l3`, `drill:outage`.
+
+### Sales list: search, filters and totals
+
+One list shows every order the provider has created (D31):
+
+| Status | Action |
+|---|---|
+| Draft | Continue, Discard draft |
+| Sent (expires in N days) | Copy link, New link, Cancel order |
+| Expired | New link, Cancel order |
+| Needs review | None needed |
+| Paid | Order again |
+| Cancelled | Order again |
+
+- **Search** by patient name or order ref. The search text is sent in the request body, never in the URL or the logs, because clinic computers are shared.
+- **Filters:** status, and a date range on **created, sent or paid** date, in the practice's time zone. These can live in the URL.
+- **Order and paging:** newest first by the chosen date, 25 to a page. The result count is announced ("12 orders").
+- **Headline totals:** this month so far, **by paid date in the practice's time zone**, ignoring filters. October means paid in October.
+- **A footer row adds up the paid orders currently shown.** "Paid orders in this view: 1 · $36.00 · earned $15.73 · fees $0.27." When none are paid it says "No paid orders in this view."
+- **Platform-wide totals use UTC.** An order paid at 10pm Pacific on October 31 counts as October in Dr. Rivera's Sales but as November in the platform totals, so the two don't add up month by month.
+
+## 9. Frontend
+
+```mermaid
+flowchart TB
+  portal["Provider portal: laptop first, interactive<br/>Sales · New order · Order details · My store · Sign in"] --> comps
+  paypage["Pay page: phone first<br/>server-rendered, the Pay form works without JavaScript"] --> comps
+  comps["Shared components<br/>Money · StatusBadge · PriceOrMarginInput · QuantityField · LineEditor<br/>DataTable · Alert · ErrorSummary · EmptyState · CopyLinkButton · DemoBanner · ProductImage"]
+  comps --> tokens["Design tokens<br/>palette A · portal: Source Sans 3, 16px · patient: Atkinson Hyperlegible Next, 19px"]
+  comps --> shared["Shared with the server<br/>Pricing · money formatting · status words · Zod schemas"]
+  comps --> io["Talking to the server<br/>server actions · autosave after a 1 s pause · SSE on the pay page"]
+```
+
+| Page | Shows | Actions |
+|---|---|---|
+| **Sales** (home) | Headline totals, then the order list with search, filters, and a footer row | The action for each status |
+| **New order** | Patient picker. Once a patient is chosen, that patient's recent orders with Order again. Then lines with quantity, price or margin, "You earn", saving against retail, and totals. | Send, then "Sent to Sam" with Copy link |
+| **Order details** | Each line's price, cost, fee and margin; totals; fee rate; times; the audit trail | Copy link, New link, Order again, Cancel order |
+| **My store** | The catalog with cost, lowest price and retail price, plus the provider's items with usual prices | Add, remove, set the usual price, No profit |
+| **Pay page** | The six states ([§6](#6-pay-links)) | Pay |
+
+**Rules:**
+- **The server owns every amount and status. The browser owns only what's being typed.** "You earn" is computed by the shared Pricing module while the provider types, and the autosave response then replaces it with the server's split. If they ever differ, the server wins and the mismatch is logged as a bug.
+- **The pay page is built on the server first.** The order is readable before any script loads, which matters on old phones. A small script adds card formatting and SSE. The page makes no requests to other sites: we host the fonts ourselves and send no `Referer` header.
+- **The status words live only in `StatusBadge`.** Each word is paired with an icon and is never shown by colour alone.
+- **Autosave never re-renders the field being typed in.** It shows "Saving…", "Saved", or "Not saved, retrying".
+- **Hard widgets use React Aria Components:** the patient picker combobox, the Cancel order dialog, the price-or-margin radio group, and the quantity field.
+
+### Visual design: tokens and patterns
+
+**Palette A (D35),** from the US Web Design System. All three candidates, with contrast and colour-blindness checks computed on the page, are in [design/palettes.html](design/palettes.html).
+
+| Token | Value | Checked against |
+|---|---|---|
+| `--text` | #1b1b1b | 17.2:1 on the page background |
+| `--text-muted` | #565c65 | 6.7:1 |
+| `--bg` / `--surface` | #ffffff / #f1f3f6 | — |
+| `--primary` / `--primary-hover` | #005ea2 / #1a4480 | White text on it: 6.7:1 |
+| `--border` / `--input-border` | #dfe1e2 / #565c65 | The input border is 6.1:1 or better |
+| `--focus` | #0076d6 | 4.6:1 on the background, 4.1:1 on the surface |
+| `--success` / tint | #216e1f / #ecf3ec | 5.6:1 on its tint |
+| `--warning` / tint | #7a591a / #faf3d1 | 5.7:1 |
+| `--error` / tint | #b50909 / #f4e3db | 5.6:1 |
+| `--info` / tint | #2e6276 / #e7f6f8 | 6.0:1 |
+| Demo banner | #1b1b1b on #ffbe2e | 10.4:1 |
+
+**Fonts** (both under the SIL Open Font License, hosted by us):
+- **Portal:** **Source Sans 3**, 16px. Its digits are all the same width, so prices line up in columns.
+- **Patient page:** **Atkinson Hyperlegible Next**, 19px body text with a line height of 1.5. It was designed for low-vision readers.
+
+### Accessibility
+
+The target is **WCAG 2.2 AA**.
+
+| Area | Rule |
+|---|---|
+| **Contrast** | Text at least 4.5:1. Borders and focus rings at least 3:1. All checked above. |
+| **Colour blindness** | Red and green statuses become hard to tell apart under protanopia and deuteranopia: their colour difference drops from about 100 to 15–27. So every status has a word and an icon. |
+| **Contrast themes** (`forced-colors`) | Buttons, badges and status boxes keep real borders. Focus uses `outline`, which survives. Nothing depends on a background tint alone. |
+| **Increased contrast** (`prefers-contrast: more`) | Secondary text becomes body text, and light borders darken |
+| **Structure** | Landmarks, headings in order, `lang="en"`, real tables with header cells, buttons for actions, links for navigation. The page title changes with each pay-page state, for example "Paid · Lakeview Family Practice". |
+| **Forms** | A visible label on every field. Hints and errors are linked to their field (`aria-describedby`), and invalid fields are marked (`aria-invalid`). After a failed Send or Pay, focus moves to an error summary at the top, with the hidden prefix "Error:". Checking a field when you leave it never moves focus. |
+| **Live updates** | "You earn" (after typing pauses), "Saved", "Link copied", and pay-page changes are announced through `role="status"`, without moving focus |
+| **Money** | The struck-through price is read as "Retail price $40.00". Product images have alt text, such as "Magnesium Glycinate, 120 capsules". |
+| **Keyboard** | Everything works with Tab, Enter, Space and the arrow keys, and the tab order follows the visual order. The portal has a skip link. A sticky header never hides the focused element. Pay page order: card number → expiry → security code → ZIP → Pay → help. Targets are 40–56px, above the 24px minimum. |
+| **Zoom and reflow** | Works at 200% zoom and at 320px wide |
+| **Motion and time** | Honours `prefers-reduced-motion`. No time limits on the payment form. |
+| **Dark mode** | Not in the slice. WCAG doesn't require it, and light mode reads better for most people. It would help readers with cloudy vision, so it's a next step (DECISIONS.md, Cut). |
+
+## 10. Security and privacy
+
+- **Provider login (D32):**
+  - A JWT signed with `JWT_SECRET` using the `jose` library, and **only HS256 is accepted**.
+  - It sits in a cookie that is `HttpOnly`, `Secure`, `SameSite=Lax`, and expires after 12 hours.
+  - Every portal query is limited to that provider. One session can't be cut off before it expires, which we accept for a fake login.
+- **Pay links** are signed and expire, and never appear in logs or `Referer` headers ([§6](#6-pay-links)).
+- **Patient data is minimal.** There is no patient name on the pay page and no product names in links or email subjects. Search text is kept out of URLs and logs.
+- **A link holder can see and pay for that one order.** Paying only sends money in, so the risk is privacy: product names can hint at health. We accept this for the slice. The next step is a one-time code by SMS before the order is shown (DECISIONS.md, Cut). That would need the patient's phone number from the EHR.
+- **The server computes all money.** Every request is checked with Zod, and the pay action takes no amount.
+- **Secrets are environment variables:** `DATABASE_URL`, `JWT_SECRET`, `LINK_SIGNING_KEY`. None are in the repo.
+- **The demo is labelled and hidden:** a visible "Demo — not a real store" banner, plus `X-Robots-Tag: noindex` and a `robots.txt` that disallows everything.
+
+## 11. Observability
+
+- **Logs:** pino writes structured JSON, with patient fields redacted. Each request gets a request ID.
+- **One log line per status change**, with the order ref, the old and new status, and the actor. No patient data.
+- **Health:** `GET /api/health` checks the database connection and the migration version. Render uses it to decide whether a new deploy gets traffic.
+- **Totals always come from the database,** never from a cache.
+- **Reconciliation** runs as a command, in CI on the seeded data, and after every load test.
+
+## 12. Stack and hosting
+
+**Why the backend is TypeScript (D33):**
+
+| # | Reason |
+|---|---|
+| 1 | **The browser and server run the same money code.** One Pricing module produces both the live "You earn" and the server's authoritative split, so the two can't drift apart. |
+| 2 | **Types are checked from end to end.** Next.js server actions are typed function calls, so renaming a field flags every page that uses it. Zod gives validation and types from one definition. |
+| 3 | **One deployable, not two.** Next.js already runs our server code. A backend in another language would be a second service, with an API between the two to design, version, and deploy. |
+| 4 | **It suits the workload.** The server mostly waits on Postgres, on the payment company, and on open SSE connections. Node handles thousands of idle connections cheaply. |
+| 5 | **One toolchain.** Vitest, fast-check, Playwright and k6 all use JavaScript or TypeScript. |
+| 6 | **It's the user's strongest language.** No context switching in a 1–2 day time box. |
+
+**The trade-off we accept:** JavaScript numbers are floating-point, which is a hazard for money. We neutralise it:
+- **Integer cents everywhere.** These are exact up to about $90 trillion.
+- **One rounding helper,** pinned down by the golden cases.
+- **Database sums read as strings,** never as floats.
+
+**Alternatives considered:** Python, Go, and Java/Kotlin are all strong backend languages. Each would mean two languages, Pricing written twice, and a separate service.
+
+**Why PostgreSQL (D33):** it is the one database with every feature the design relies on:
+- partial unique indexes
+- row locks
+- `CHECK` constraints with arithmetic
+- triggers
+- `AT TIME ZONE`
+- LISTEN/NOTIFY
+- advisory locks
+- migrations that roll back completely on failure
+
+The alternatives each lack something:
+- **MySQL:** no partial indexes and no LISTEN/NOTIFY.
+- **SQLite:** no row locks and no LISTEN/NOTIFY, and it can't serve several app servers.
+- **Document databases:** they *could* run the flow (MongoDB has transactions, and DynamoDB has conditional writes), but most money rules would move from the schema into application code, and reporting would need extra machinery. With Postgres, every rule is readable in the migrations, and the database refuses bad data even when our code has a bug.
+
+| Layer | Choice |
+|---|---|
+| Framework | **Next.js 16**, App Router, run as a Node server with `next start`. Caching is opt-in in version 16. The user knows it best (D33). |
+| Database access | **Drizzle ORM**, with its SQL migrations committed. The money transactions (Send, Pay, the sweep) are explicit SQL. |
+| Validation | **Zod** |
+| Login | **jose** (JWT) |
+| UI widgets | **React Aria Components** |
+| Styling | **CSS custom properties** (the tokens) + **CSS Modules** |
+| Logs | **pino** |
+| Tests | **Vitest** + **fast-check**; integration tests against real Postgres in Docker; **Playwright** + **@axe-core/playwright** |
+| Load tests | **k6** |
+| Runtime | **Node 24 LTS** |
+| Local setup | **Docker Compose** for Postgres |
+| CI | **GitHub Actions** |
+
+**Hosting: $0 (D34).**
+- **Render Free** for the app, **Neon Free** for Postgres, connected directly rather than through Neon's pooler, because LISTEN needs a direct connection.
+- **The cost:** after 15 idle minutes the app sleeps, and the first visit takes about a minute to wake it. The README says so.
+- **The sweep:** pauses while the app sleeps and runs as soon as it starts, so a payment left pending is settled when the next person visits.
+- **The upgrade:** move the app to Render Starter ($7 a month). If we do, the sweep should query only when a payment is pending, so an always-on app doesn't keep Neon awake and use up its free compute.
+- **Production would use** an always-on plan and a managed Postgres with point-in-time restore. The cheapest that meets every requirement is Render Starter plus Render Postgres, $13.30 a month (researched 2026-10-06).
+- **Ruled out:**
+  - Render's free database is deleted after 30 days.
+  - Supabase Free has no backups.
+  - Fly.io and DigitalOcean cost more than $15 a month once the database has real backups.
+
+## 13. Testing and delivery
+
+### Test layers
+
+| Layer | Proves |
+|---|---|
+| **Golden cases** (`tests/golden/money.cases.ts`) | Money examples with exact answers: $20.00 → $20.16 lowest price, $38.00 → 29¢ fee, 2 × $36.10 → 56¢ fee and $31.64 earned, $36.00 → 27¢ and $15.73. **Frozen once approved.** Changing an expected value means changing a money rule, which needs the user's OK. |
+| **Property tests** (fast-check) | For thousands of random prices and costs: the parts always add up, the margin is never negative at or above the lowest price, the fee always rounds up, and entering a margin lands within 1¢ of it |
+| **Integration tests** (real Postgres) | Each database rule refuses bad data. Every row of the Pay "breaks" table behaves as designed. The race test charges exactly once. The sweep settles each test-card outcome. Cancel and Pay at the same moment never leave a paid cancelled order. |
+| **End-to-end** (Playwright) | The provider builds and sends an order, then the patient pays. axe runs on every page and every pay-page state. A **keyboard-only** run completes the flow. Accessibility-tree snapshots cover the pay-page states. Runs are emulated under a contrast theme and at 320px wide. |
+| **Manual** | One NVDA screen-reader pass on the pay flow, recorded in the report |
+| **Load and drill** | [§2](#load-tests) |
+
+### Check layers
+
+These stop a push from breaking production (D36):
+
+```mermaid
+flowchart LR
+  edit["Edit code"] --> verify["npm run verify<br/>on the laptop, 1–2 min"]
+  verify --> push["npm run push<br/>GitHub, then GitLab"]
+  push --> ci["GitHub CI<br/>fresh machine + browser tests"]
+  ci --> merge["Merge to main<br/>only if CI passed"]
+  merge --> deploy["Render: build, migrate,<br/>health check"]
+  deploy --> smoke["Smoke test<br/>on the live URL"]
+```
+
+| Layer | What runs | What it catches |
+|---|---|---|
+| `npm run verify` | Typecheck, lint, golden cases, unit and property tests, integration tests against the local Postgres, reconciliation on a fresh seed | Most bugs, before anything leaves the laptop |
+| `npm run push` | `verify` once, then `git push origin` and `git push gitlab` | A push that skipped the checks, or reached only one remote |
+| GitHub CI | Everything in `verify`, plus Playwright (end-to-end, axe, keyboard) and the README number check | "Works on my machine" problems and accessibility regressions |
+| Branch protection | `main` accepts only merges whose CI passed, admins included | Untested code reaching production |
+| Render health check | A new version gets traffic only after `/api/health` passes | A version that can't start. The old version keeps serving. |
+| `npm run smoke` | Against the live URL: health, a seeded pay link loads, the portal login works. Allows 2 minutes for Render Free to wake. | Production-only mistakes, such as a wrong signing key |
+
+CI runs only on GitHub, and the README links to its runs so graders reading GitLab can find them. Branch protection and the Render health-check path are set up in the deploy milestone, with the user's approval.
+
+**Demo video:** a slowed-down Playwright script drives the demo (`slowMo`) while the user records and narrates. The slow-approve outage scene runs on the laptop.
+
+## 14. Configuration
+
+| Setting | Demo | Production | Rule |
+|---|---|---|---|
+| `FEE_RATE_BPS` | 75 | 75 | Copied onto each order at Send |
+| `LINK_TTL_DAYS` | 30 | 30 | — |
+| `PAYMENT_TIMEOUT_MS` | 10,000 | Set by the provider | — |
+| `SWEEP_EVERY_MS` | 5,000 | ~120,000 | The sweep also runs at server start |
+| `SWEEP_AFTER_MS` | 15,000 | ~300,000 | Longer than `PAYMENT_TIMEOUT_MS` |
+| `STUB_SLOW_APPROVE_MS` | 7,000 | — | Shorter than `PAYMENT_TIMEOUT_MS` |
+| `SSE_HEARTBEAT_MS` / `SSE_MAX_MS` | 15,000 / 300,000 | Same | — |
+| `AUTOSAVE_DEBOUNCE_MS` | 1,000 | Same | — |
+| `PAYMENTS_MODE` | `stub` | `stripe` | Test cards exist only in `stub` |
+| Secrets | `DATABASE_URL` (direct connection), `JWT_SECRET`, `LINK_SIGNING_KEY`, `STUB_STORE_PATH` | Same, minus the stub | Never committed |
+
+## 15. Repository layout
+
+```
+src/
+  app/                  Next.js routes: delivery only
+    (portal)/           sales/, orders/new/, orders/[ref]/, store/, sign-in/
+    pay/[token]/        page.tsx (six states), events/route.ts (SSE)
+    api/health/         route.ts
+  server/               business modules; never import Next.js
+    access/ store/ orders/ payments/ reporting/ links/
+    ports/              payment-gateway.ts, link-sender.ts, patient-directory.ts
+    adapters/           stub-payments/ (own file store), log-link-sender.ts, seeded-patients.ts
+    db/                 schema.ts, client.ts, notify.ts (LISTEN/NOTIFY)
+  shared/               runs in the browser and on the server: pricing/, money.ts, status.ts, schemas.ts
+  ui/                   components/, tokens.css, fonts/
+instrumentation.ts      starts the sweep (Node runtime only)
+drizzle/                SQL migrations (committed)
+scripts/                seed, reconcile, sweep, verify, push, smoke, drill-outage
+tests/                  golden/, unit/, integration/, e2e/, load/ (k6)
+docs/                   this doc, design/palettes.html, LOAD_TESTS.md
+docker-compose.yml
+```
+
+## 16. Build order
+
+Each milestone is a vertical slice with a check that proves it. Cards are seeded on the Notion board only after `grill`. If time runs short, cut from the bottom: the Level 3 test and the outage drill first, then visual polish.
+
+| # | Milestone | Done when |
+|---|---|---|
+| M0 | **Skeleton:** Next.js app, Docker Postgres, Drizzle, health route, `setup`, `verify`, `push`, and GitHub CI | `npm run setup` works from a clean clone, `/api/health` returns 200, and CI is green |
+| M1 | **Money core:** shared Pricing, golden cases, property tests; the schema with every database rule; integration tests | Every golden and property test passes, and each database rule has a test that shows it refusing bad data |
+| M2 | **Sign in and My store** (F1) | Playwright F1 passes axe and the keyboard run, and out-of-range prices show the USERS.md messages |
+| M3 | **New order to Send** (F2): autosave, quantity, live "You earn", Send, signed links, Copy link, New link, Cancel order, Order again | Playwright F2 passes. A double-clicked Send gives one link. Send against an out-of-range line is refused. |
+| M4 | **Pay** (F3): the six states, the pay action, the stub with test cards, the sweep, SSE with NOTIFY | Every row of the "breaks" table has a passing test. The race test gives exactly one charge. A keyboard-only Pay works. |
+| M5 | **Sales, Order details, reconciliation** (F4, F5): filters, search, headline and footer totals, audit trail | Totals on the seed match reconciliation, and the filters pass end to end |
+| M6 | **Seed history and polish:** months of orders through the real code; visual polish on New order and the pay page (D12); the NVDA pass | `reconcile` is clean on the seed, and axe is clean everywhere |
+| M7 | **Deploy:** Render and Neon, secrets, noindex, health check, branch protection, `smoke` | `npm run smoke` passes against the live URL |
+| M8 | **Load tests and drill**, written up in `docs/LOAD_TESTS.md` | The Level 1 bar is met, and Levels 2–3 and the drill are recorded |
+| M9 | **README, final logs, demo video** | The README's numbers match a fresh CI run, and the video is recorded |
+
+## 17. Known limitations
+
+- **Card fees are larger than our fee.** Real card processing costs about 2.9% + 30¢, roughly four times the 0.75% fee ([PROBLEM_SPACE.md](PROBLEM_SPACE.md#known-limitations)).
+- **Moved volume overcounts.** Every order counts as moved off a third-party marketplace, including orders that are simply new (D8).
+- **The demo is slow to wake.** The free hosting sleeps when idle, so the first visit takes about a minute. There is no standby database, and the demo database has a 6-hour restore window.
+- **Whoever holds a link can see and pay for that order.** Nothing checks that the person paying is the patient.
+- **Monthly totals don't line up across views.** Per-practice totals and platform totals (UTC) differ at month boundaries.
+- **The last draft save wins.** Two people editing the same draft can overwrite each other.
+- **The sweep needs an always-on server in production.** It runs from Next.js's `instrumentation.ts`, which is documented for monitoring, not background work.
+- **SSE across several servers needs a direct database connection** for LISTEN. Transaction-mode connection poolers don't support it.
+- **Unconfirmed: whether Neon suspends while our LISTEN connection is open.** If it doesn't, the database stays awake while the app is up. That still fits Neon's free compute while Render Free sleeps. Checked at M7.
+- **The Level 3 load test measures the laptop more than the design.**
+- **The order counts depend on a $100 average order value,** which isn't published anywhere.
+- **The rest of what's cut is in DECISIONS.md:** refunds, real payments, tax, shipping, stock, automatic repeat orders, dark mode, and patient verification.

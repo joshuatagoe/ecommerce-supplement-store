@@ -1,6 +1,6 @@
 # Problem space
 
-The problem space for the supplement-ordering slice, agreed with the user on 2026-10-05: what we're building, how money moves, and the quality bar. It doesn't choose a stack, data model, or seams.
+The problem space for the supplement-ordering slice, agreed with the user on 2026-10-05: what we're building, how money moves, and the quality bar. It doesn't choose a stack, data model, or seams; those are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Decisions and their trade-offs are in [DECISIONS.md](DECISIONS.md). Users and UX flows are in [USERS.md](USERS.md). How we used AI is in [AI_USAGE.md](AI_USAGE.md).
 
@@ -43,9 +43,9 @@ The provider is the primary user. Providers bring the patients, so provider enga
 Per item: **patient price = COGS + provider margin + platform fee.**
 
 - **COGS:** what we paid the brand for the item. It is seeded data.
-- **Platform fee:** 0.75% of the full item price, rounded once to the cent. It is built into the price and is never a separate line for the patient.
+- **Platform fee:** 0.75% of the full item price, rounded up to the next whole cent, once per item (D17). Any fraction of a cent goes to the platform. It is built into the price and is never a separate line for the patient.
 - **Provider margin:** what is left after COGS and the fee. It is computed by subtraction, so the three parts always add up exactly to the price.
-- **Lowest price:** the smallest price where the margin is at least $0. With COGS of $20.00 that is $20.15 (fee $0.15, margin $0.00). This is the no-profit option.
+- **Lowest price:** the smallest price where the margin is at least $0. With COGS of $20.00 that is $20.16 (fee $0.16, margin $0.00). At $20.15 the fee also rounds up to $0.16, which would leave a margin of −1¢. This is the no-profit option.
 - **Highest price:** the MSRP (manufacturer's suggested retail price).
 - **Price or margin entry:** the provider can type either. If they type a margin, we compute the price and then recompute the margin from it. Rounding can make the result differ by 1¢ from what was typed.
 - **Payee:** the provider. Each provider belongs to a practice, so practice totals are possible later.
@@ -86,7 +86,7 @@ UX polish goes into New order and Checkout. Sales and My store stay plain.
 
 ## Integrity rules
 
-- All amounts are integer cents. The fee is rounded once per item. The margin is computed by subtraction.
+- All amounts are integer cents. The fee is rounded up once per item. The margin is computed by subtraction.
 - A price below the lowest price or above MSRP is rejected.
 - Paid orders and their split never change.
 - Catalog or store changes after an order is sent do not change that order.
@@ -108,7 +108,7 @@ UX polish goes into New order and Checkout. Sales and My store stay plain.
 | Accessibility to WCAG 2.2 AA, checked with axe and a keyboard pass | Yes |
 | Mobile-first patient page | Yes |
 | Observability: a log entry per status change with no patient data; a health check; totals from the database | Light |
-| Performance: index provider orders by paid date; keep the patient page light | Minimal, stated |
+| Performance: indexes for the Sales list; a light patient page; load tests at three scale levels on a laptop, with a report (D18) | Yes, stated and measured |
 | One-command setup with seed data; deployed URL; CI on every push; README figures checked against a fresh test run | Yes |
 | UTC timestamps; monthly totals in a stated time zone | Yes |
 | Room for refunds, refills, and real payments later, through clean seams | Design only |
