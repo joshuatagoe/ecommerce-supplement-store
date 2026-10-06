@@ -30,4 +30,6 @@ Run this again on the diff, in the same turn you would otherwise commit. This pa
 - **Product** — did user-facing behavior drift, and what is still out of scope
 - **Engineering** — which files, contracts, or failure behavior changed
 - **QA** — which checks proved it, including the negative case, and the failure seen before the code
+- **Logs** — this diff's decisions, cuts, and AI course-corrections are in `docs/DECISIONS.md` and `docs/AI_USAGE.md`
+
 Do not commit, push, or mark the card Done in that same message. Wait for an answer or an explicit acceptance of the named assumptions. If grill was skipped, there is no commit.

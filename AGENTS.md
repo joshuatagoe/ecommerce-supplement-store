@@ -12,6 +12,12 @@ Status lives only on the Notion board named in [docs/status-board.md](docs/statu
 
 Past project lessons live in `C:\Users\joshu\.agents\workflow-reports`, not in this repo. Read the newest report for each project before architecture and before a new plan. Older reports stay. Do not rewrite them. A new report is a dated file in that folder, and the README index there is updated.
 
+## Submission logs
+
+Required deliverables are the README, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/AI_USAGE.md](docs/AI_USAGE.md), the deployed URL, and a demo video. Each has a card on the status board.
+
+When work makes a decision with a trade-off, cuts something, or corrects the AI, log it in the same commit as the work: decisions and cuts in DECISIONS.md, AI corrections in AI_USAGE.md. Do not rebuild these logs at the end.
+
 ## Skills
 
 Follow the project skills in `.cursor/skills/`. They replace the personal `plan-implementer` skills here.
