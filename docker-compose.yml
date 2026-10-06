@@ -1,5 +1,9 @@
 # Local Postgres. `db` keeps its data in a volume; `db-test` runs in memory
 # with disk syncing off, because test data is thrown away (M0 grill).
+# The fixed project name makes `docker compose` run inside a git worktree reach
+# these same containers instead of starting a second set on the same ports (D45).
+name: ecommerce-supplement-store
+
 services:
   db:
     image: postgres:18

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 import { checkHealth } from "@/server/health";
@@ -26,19 +27,16 @@ describe("checkHealth", () => {
   });
 
   it("reports migrations behind on a database that was never migrated", async () => {
+    // A name of its own, so a test run in another worktree can't drop it mid-test (D45).
+    const scratch = `health_unmigrated_${randomUUID().slice(0, 8)}`;
     const unmigrated = new URL(testUrl());
-    unmigrated.pathname = "/health_unmigrated";
-    await withPool({ connectionString: testUrl() }, async (admin) => {
-      await admin.query("DROP DATABASE IF EXISTS health_unmigrated");
-      await admin.query("CREATE DATABASE health_unmigrated");
-    });
+    unmigrated.pathname = `/${scratch}`;
+    await withPool({ connectionString: testUrl() }, (admin) => admin.query(`CREATE DATABASE ${scratch}`));
     try {
       const health = await withPool({ connectionString: unmigrated.href }, (pool) => checkHealth(pool, JOURNAL));
       expect(health).toEqual({ ok: false, db: "up", migrations: "behind" });
     } finally {
-      await withPool({ connectionString: testUrl() }, (admin) =>
-        admin.query("DROP DATABASE IF EXISTS health_unmigrated"),
-      );
+      await withPool({ connectionString: testUrl() }, (admin) => admin.query(`DROP DATABASE IF EXISTS ${scratch}`));
     }
   });
 

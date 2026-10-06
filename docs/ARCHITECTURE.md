@@ -389,6 +389,13 @@ All money is **integer cents**. Every timestamp is `timestamptz`, stored in UTC.
 | **payment_attempts** | One try at paying | `id` (also the payment company's idempotency key), `order_id`, `idempotency_key` (the page's Pay key), `amount_cents`, `status` (`pending`, `succeeded`, `declined`, `failed`), `charge_ref`, `settled_by` (`request` or `sweep`), `created_at`, `settled_at` |
 | **order_events** | One audit entry | `id`, `order_id`, `kind`, `actor_type` (`provider`, `patient`, `sweep`, `system`), `actor_id`, `at`, `details` (`jsonb`, never patient data) |
 
+**Column details** (D45):
+- **IDs** are `uuid`, filled in by the database with `uuidv7()` (built into Postgres 18). `store_items` has no `id`; its key is the pair.
+- **Statuses** are `text` with a `CHECK` on exactly these words: orders `draft`, `sent`, `needs_review`, `paid`, `cancelled`; payment attempts `pending`, `succeeded`, `declined`, `failed`; `settled_by` `request`, `sweep`; `actor_type` `provider`, `patient`, `sweep`, `system`.
+- **`ref`** is unique `text`, stored the way links show it (`K7Q2-M9XD`). Orders generates it (M3).
+- **Anything unknown until Send is NULL:** an order's four totals, `fee_rate_bps`, `link_version`, `link_expires_at` and `sent_at`, and a line's frozen columns. A draft needs only `ref`, `provider_id`, `practice_id`, `patient_id` and `status`. A draft line needs only `order_id`, `catalog_item_id`, `quantity` and `unit_price_cents`.
+- **Defaults:** `created_at`, `updated_at` and `order_events.at` default to `now()`. `order_events.kind` is free text. `actor_id` is a `uuid`, empty for the sweep and the system.
+
 **Not in our database:**
 - **The payment stub's records** live in their own file, so stopping our database doesn't wipe the payment company's memory.
 - **Sessions** are a signed cookie.
@@ -403,7 +410,7 @@ These implement D17, D28 and D4.
 - **A line:** each per-bottle amount × quantity. Two bottles at $36.10 have a fee of 2 × 28¢ = 56¢ and earn $31.64.
 - **Lowest price:** the smallest price whose margin is at least zero. A $20.00 cost gives a lowest price of **$20.16**, because at $20.15 the fee rounds up to 16¢ and the margin would be −1¢.
 - **Highest price:** the MSRP (D14).
-- **Price or margin entry:** if the provider types a margin, Pricing finds the price, then recomputes the margin from that price (D5).
+- **Price or margin entry:** if the provider types a margin, Pricing finds the lowest price that earns exactly that margin (D5). Every whole-cent margin can be hit, because each extra cent of price adds 0¢ or 1¢ of margin, never 2¢. On a $20.00 cost, both $36.00 and $36.01 earn $15.73 (their fees are 27¢ and 28¢), and Pricing picks $36.00.
 
 Sam's line after Send:
 
@@ -417,6 +424,38 @@ Sam's line after Send:
 | `unit_margin_cents` | 1573 | 3600 − 2000 − 27 |
 | `unit_msrp_cents` | 4000 | Copied, so "you save $4.00" never changes |
 | `product_name`, `image_*` | "Magnesium Glycinate, 120 capsules" | Copied, so renaming the product later changes nothing |
+
+### Pricing contract
+
+`src/shared/pricing/index.ts` exports these functions (D45). Store, Orders, the browser and the golden cases call them by these names. Every amount is integer cents, and every rate is basis points (75 = 0.75%).
+
+```ts
+type Split = { priceCents: number; costCents: number; feeCents: number; marginCents: number };
+type PriceCheck =
+  | { ok: true; lowestPriceCents: number; msrpCents: number }
+  | { ok: false; code: "PRICE_BELOW_LOWEST" | "PRICE_ABOVE_RETAIL"; lowestPriceCents: number; msrpCents: number };
+
+feeCents({ priceCents, feeRateBps }): number
+unitSplit({ priceCents, costCents, feeRateBps }): Split
+lineSplit({ priceCents, costCents, feeRateBps, quantity }): Split
+orderTotals(lines: Split[]): Split
+lowestPriceCents({ costCents, feeRateBps }): number
+priceForMarginCents({ marginCents, costCents, feeRateBps }): number
+checkPrice({ priceCents, costCents, msrpCents, feeRateBps }): PriceCheck
+```
+
+| Function | Returns |
+|---|---|
+| `feeCents` | ceil(price × rate ÷ 10,000) |
+| `unitSplit` | One bottle's split. The margin is price − cost − fee, so it is negative below the lowest price. |
+| `lineSplit` | Each part of the unit split × quantity (D28). Its `priceCents` is the line total. |
+| `orderTotals` | Each part summed over the lines. No lines gives all zeros. |
+| `lowestPriceCents` | The smallest price whose margin is at least zero |
+| `priceForMarginCents` | The smallest price whose margin is exactly `marginCents` |
+| `checkPrice` | `ok` when lowest price ≤ price ≤ MSRP. A price below the lowest returns `PRICE_BELOW_LOWEST`, even if it is also above MSRP. Both bounds always come back, so a line can show its allowed range. |
+
+- **Bad input throws a `RangeError`:** an amount or margin that isn't a whole, non-negative number of cents, a rate outside 0–10,000, or a quantity below 1. The 1–10 quantity cap belongs to Orders and the database.
+- **No Node or server imports,** because the same module runs in the browser.
 
 ### Database rules
 
@@ -682,7 +721,7 @@ The alternatives each lack something:
 | Layer | Proves |
 |---|---|
 | **Golden cases** (`tests/golden/money.cases.ts`) | Money examples with exact answers: $20.00 → $20.16 lowest price, $38.00 → 29¢ fee, 2 × $36.10 → 56¢ fee and $31.64 earned, $36.00 → 27¢ and $15.73. **Frozen once approved.** Changing an expected value means changing a money rule, which needs the user's OK. |
-| **Property tests** (fast-check) | For thousands of random prices and costs: the parts always add up, the margin is never negative at or above the lowest price, the fee always rounds up, and entering a margin lands within 1¢ of it |
+| **Property tests** (fast-check) | For thousands of random prices and costs: the parts always add up, the margin is never negative at or above the lowest price, the fee always rounds up, and entering a margin lands exactly on it, at the lowest such price |
 | **Integration tests** (real Postgres) | Each database rule refuses bad data. Every row of the Pay "breaks" table behaves as designed. The race test charges exactly once. The sweep settles each test-card outcome. Cancel and Pay at the same moment never leave a paid cancelled order. |
 | **End-to-end** (Playwright) | The provider builds and sends an order, then the patient pays. axe runs on every page and every pay-page state. A **keyboard-only** run completes the flow. Accessibility-tree snapshots cover the pay-page states. Runs are emulated under a contrast theme and at 320px wide. |
 | **Manual** | One NVDA screen-reader pass on the pay flow, recorded in the report |

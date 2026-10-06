@@ -113,3 +113,17 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 23. **The AI said today's harness commit was on `docs/problem-space`.** It was on `main`. The AI trusted the git status shown at the start of the session, which was stale, and didn't check the branch before committing. Nothing was pushed. Lesson: run `git branch --show-current` before every commit.
 24. **The AI wrote the placeholder page, `robots.txt` and the noindex header before running their end-to-end test,** so it never saw those tests fail first. It caught this itself and made up for it by breaking each part on purpose and watching the tests fail.
 25. **Neon's onboarding offered a CLI setup (`neon deploy`, `neon skills`, `neon mcp`).** It would have deployed the app to Neon and added unreviewed skills and an MCP server to the repo. It was skipped, because Neon is only the database here and the app runs on Render (D34).
+
+## 2026-10-06 — M1 experiment setup (D43, D45)
+
+### What worked
+
+- **An exhaustive check before writing the Pricing contract.** A short Node script tried every price for 205 million price-and-cost pairs and found that the margin never rises by more than 1¢ per cent of price. That settled the margin-entry rule before any arm built it.
+- **Testing the hidden referee before trusting it.** A reference M1 kept outside the repo was broken one rule at a time, 43 ways, and each break had to turn the referee test aimed at it red. One test stayed green because a different rule happened to refuse the same data; it was rewritten so only its own rule can refuse it.
+- **Reproducing each test-setup bug before fixing it.** Two worktrees running the integration tests at the same moment failed 5 times out of 5 on the health test's shared scratch database. After the D45 fixes, the main checkout and two worktrees together passed 5 times out of 5.
+- **A throwaway worktree agent that only reported where it ran.** It showed that Claude Code puts agent worktrees inside the repo (`.claude/worktrees/`), with no `.env` or `node_modules`, before any parallel arm hit that.
+
+### Where AI misled us or we course-corrected
+
+26. **The AI wrote a false trade-off into D5: "The margin can be 1¢ off what the provider typed."** It was written into DECISIONS.md during the problem-space session without a check, and carried into PROBLEM_SPACE.md and the §13 property test ("lands within 1¢"). Each extra cent of price adds 0¢ or 1¢ of margin, so every margin can be hit exactly. Found while writing the Pricing contract and confirmed by the exhaustive check above. All three places now say "exactly, at the lowest such price". Had it stayed, an arm following §13 could have shipped a price 1¢ off and passed its own tests.
+27. **The AI proposed fixing the work split for the parallel arms in advance, and installing fast-check and zod for them.** The aim was to make arms 3 and 4 differ only in file sharing. The user pointed out that this defeats the experiment: in real use the AI splits the work and adds dependencies itself, so a hand-made split would measure a setup that won't exist later. Each arm's lead agent now decides its split, and the scoring records which split it chose. Only bugs in the test setup that every parallel run would hit once are fixed in advance (D45).

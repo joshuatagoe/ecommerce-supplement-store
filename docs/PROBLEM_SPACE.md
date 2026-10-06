@@ -47,7 +47,7 @@ Per item: **patient price = COGS + provider margin + platform fee.**
 - **Provider margin:** what is left after COGS and the fee. It is computed by subtraction, so the three parts always add up exactly to the price.
 - **Lowest price:** the smallest price where the margin is at least $0. With COGS of $20.00 that is $20.16 (fee $0.16, margin $0.00). At $20.15 the fee also rounds up to $0.16, which would leave a margin of −1¢. This is the no-profit option.
 - **Highest price:** the MSRP (manufacturer's suggested retail price).
-- **Price or margin entry:** the provider can type either. If they type a margin, we compute the price and then recompute the margin from it. Rounding can make the result differ by 1¢ from what was typed.
+- **Price or margin entry:** the provider can type either. If they type a margin, we find the lowest price that earns exactly that margin. Each extra cent of price adds 0¢ or 1¢ of margin, so every margin can be hit exactly. With COGS of $20.00, both $36.00 and $36.01 earn $15.73, and we pick $36.00.
 - **Payee:** the provider. Each provider belongs to a practice, so practice totals are possible later.
 
 Worked example, COGS $20.00, price $36.00:

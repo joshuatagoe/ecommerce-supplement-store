@@ -10,5 +10,7 @@ export default defineConfig([
     "next-env.d.ts",
     "playwright-report/**",
     "test-results/**",
+    // Agent worktrees are full checkouts that lint themselves (D45).
+    ".claude/worktrees/**",
   ]),
 ]);
