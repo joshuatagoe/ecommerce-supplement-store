@@ -1,6 +1,6 @@
 # Users
 
-Who this product is for, what they need, and how they move through it. Prices use one running example: a bottle with a $40 retail price that costs us $20. The money model is in [ARCHITECTURE.md](ARCHITECTURE.md#money-model), and the decisions referenced as D1–D16 are in [DECISIONS.md](DECISIONS.md).
+Who this product is for, what they need, and how they move through it. Prices use one running example: a bottle with a $40 retail price that costs us $20. The money model is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md#money-model), and the decisions referenced as D1–D16 are in [DECISIONS.md](DECISIONS.md).
 
 ## Summary
 

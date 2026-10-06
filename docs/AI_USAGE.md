@@ -35,3 +35,9 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 8. **The AI read "update inventory" as stock counts.** The user clarified that it means the provider's list of items they sell. Adopted as D7.
 9. **Research sources contradicted each other on Emerson's drop-ship fee.** The finding was kept as UNCONFIRMED rather than picking one source.
 10. **The AI first recommended fictional demo brands to avoid licensing risk.** The user weighed realism higher. We settled on real names with our own images (D15).
+
+## 2026-10-06 — Saving the problem space
+
+### Where AI misled us or we course-corrected
+
+11. **The AI saved the agreed problem space as a new `docs/ARCHITECTURE.md`.** It followed AGENTS.md's rule that the plan lives there. But the session wasn't meant to start the architecture, and the file took the name the architecture session should create from scratch. The user caught it after the commit. Correction: renamed to `docs/PROBLEM_SPACE.md`, and `ARCHITECTURE.md` is left for the architecture step. Lesson: put a phase's output in a file named for that phase, and flag any plan step that touches the next phase's files before the plan is approved.

@@ -1,6 +1,6 @@
 # Decisions
 
-Key decisions, why we made them, and what they cost. A new decision is added here in the same commit as the work it affects. The design these decisions shape lives in [ARCHITECTURE.md](ARCHITECTURE.md).
+Key decisions, why we made them, and what they cost. A new decision is added here in the same commit as the work it affects. The agreed problem space is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md).
 
 Status is **Accepted** (agreed with the user), **Proposed** (awaiting the user), or **Superseded** (replaced; the entry stays and points to its replacement).
 
@@ -15,7 +15,7 @@ Status is **Accepted** (agreed with the user), **Proposed** (awaiting the user),
 | D5 | The provider can enter a price or a margin. The margin is recomputed from the final price. | Requirement 1 allows either, and the fee depends on the price. | The margin can be 1¢ off what the provider typed. | Accepted |
 | D6 | The patient pays for the exact order and can't add items. | Browsing is out of scope, and requirement 1 has the provider assemble the order. | No patient self-service. | Accepted |
 | D7 | Providers keep an item list drawn from a shared seeded catalog. No stock tracking. | The user's reading of requirement 5 ("update inventory" means which items the provider sells). | We can't stop someone selling an item we're out of. | Accepted |
-| D8 | Every paid order placed with us counts as volume moved off third-party sites. | The PRD says the volume already exists. | It also counts orders that are new, not moved (see Known limitations in ARCHITECTURE.md). | Accepted |
+| D8 | Every paid order placed with us counts as volume moved off third-party sites. | The PRD says the volume already exists. | It also counts orders that are new, not moved (see Known limitations in PROBLEM_SPACE.md). | Accepted |
 | D9 | Shipping, tax, real card fees, and refunds are out of the slice. | The PRD puts them out of scope. | The real economics aren't modelled. | Accepted |
 | D10 | The provider can change an item's price on any order. It starts at their usual price. | Changing the usual price for one patient and then changing it back adds friction for our main user. | Prices can differ between patients of the same provider. | Accepted |
 | D11 | The product is a provider portal (My store, New order, Sales, Order details) plus one patient checkout per order, presented as the provider's store. | Requirement 1 has the provider assemble the order, and this ties each payment to a patient. A shared store link couldn't do that, and anyone holding it could buy. | The patient can't add items. | Accepted |

@@ -1,6 +1,6 @@
-# Architecture
+# Problem space
 
-**Status:** problem space agreed 2026-10-05. Stack, data model, and seams are pending the architecture step. Nothing here names a framework or schema yet.
+The problem space for the supplement-ordering slice, agreed with the user on 2026-10-05: what we're building, how money moves, and the quality bar. It doesn't choose a stack, data model, or seams.
 
 Decisions and their trade-offs are in [DECISIONS.md](DECISIONS.md). Users and UX flows are in [USERS.md](USERS.md). How we used AI is in [AI_USAGE.md](AI_USAGE.md).
 
@@ -119,7 +119,3 @@ Unverified note: a 2024 HHS Section 504 rule requires healthcare organizations t
 
 - **Card fees:** real card processing costs about 2.9% + 30¢, roughly four times the 75 bps fee. Every real order would lose money unless the business covers processing elsewhere. Payments are stubbed, so the slice is not affected.
 - **Moved volume overcounts:** every in-house order counts as moved off a third-party site, including orders that only happen because ordering got easier. For example, 10 moved orders and 2 new ones would be reported as 12 moved. A later fix is to ask providers for their monthly third-party spend when they sign up.
-
-## Pending the architecture step
-
-Stack and hosting (no budget set yet), data model and schema, seams for the stubbed services (payments, auth, email, shipping), order state machine, and test strategy. Before starting, re-read the newest workflow reports in `C:\Users\joshu\.agents\workflow-reports`.
