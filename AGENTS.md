@@ -1,0 +1,30 @@
+# Agent harness
+
+Read this file completely before changing the repo. Then read the plan. Explore the code. Docs can be stale; the code and a check you ran are the evidence.
+
+## Sources of truth
+
+Design lives in the plan markdown in this repo. Look, in order, for a plan already named in the conversation, then `ARCHITECTURE.md`, `PLAN.md`, `IMPLEMENTATION_PLAN.md`, and `ROADMAP.md` (repo root or `docs/`). None of those exist yet. Do not invent product behavior, a stack, or an architecture.
+
+The plan records design. Do not tick its checkboxes as status, and do not restate it into a new document.
+
+Status lives only on the Notion board named in [docs/status-board.md](docs/status-board.md). Do not create `IMPLEMENTATION.md` or any other kanban. For this repo, ignore the personal `plan-implementer` skills and their in-repo board.
+
+Past project lessons live in `C:\Users\joshu\.agents\workflow-reports`, not in this repo. Read the newest report for each project before architecture and before a new plan. Older reports stay. Do not rewrite them. A new report is a dated file in that folder, and the README index there is updated.
+
+## Skills
+
+Follow the project skills in `.cursor/skills/`. They replace the personal `plan-implementer` skills here.
+
+- `grill` before a Notion card is seeded, and again before every commit. A skipped grill means no commit.
+- `tdd-plan-implementer` when implementing a slice of the plan
+- `parallel-delivery` when splitting that work across agents
+- `frontend-engineer` when the slice has UI
+
+`frontend-design` is the visual skill for a new or reshaped page. `plan-creator` is for writing the plan. The repo plan wins if `frontend-design` would invent a subject.
+
+## Working rules
+
+If a routine technical choice is at least 80% certain, decide and proceed. Stop for scope, a public API, schema or data flow, auth, and spend. Stop again before every commit and run `grill` on the diff. Do not commit in that same message.
+
+Parallel agents share no files. The same file means one owner, in sequence. A slice with UI stays on the main checkout and uses the one dev server. A new session starts from the plan and the Notion card, not from chat memory.
