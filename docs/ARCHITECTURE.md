@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D54). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D58). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -394,7 +394,7 @@ All money is **integer cents**. Every timestamp is `timestamptz`, stored in UTC.
 - **Statuses** are `text` with a `CHECK` on exactly these words: orders `draft`, `sent`, `needs_review`, `paid`, `cancelled`; payment attempts `pending`, `succeeded`, `declined`, `failed`; `settled_by` `request`, `sweep`; `actor_type` `provider`, `patient`, `sweep`, `system`.
 - **`ref`** is unique `text`, stored the way links show it (`K7Q2-M9XD`). Orders generates it (M3).
 - **Anything unknown until Send is NULL:** an order's four totals, `fee_rate_bps`, `link_version`, `link_expires_at` and `sent_at`, and a line's frozen columns. A draft needs only `ref`, `provider_id`, `practice_id`, `patient_id` and `status`. A draft line needs only `order_id`, `catalog_item_id`, `quantity` and `unit_price_cents`.
-- **Defaults:** `created_at`, `updated_at` and `order_events.at` default to `now()`. `order_events.kind` is free text. `actor_id` is a `uuid`, empty for the sweep and the system.
+- **Defaults:** `created_at`, `updated_at` and `order_events.at` default to `now()`. `order_events.kind` is free text: `created`, `price_changed`, `sent`, `link_sent`, `new_link`, `cancelled` and `draft_discarded` so far. Orders writes every timestamp from its own clock rather than the column default, so the seed can build history through the real code (D57). `actor_id` is a `uuid`, empty for the sweep and the system.
 
 **Not in our database:**
 - **The payment stub's records** live in their own file, so stopping our database doesn't wipe the payment company's memory.
@@ -536,8 +536,8 @@ Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, messag
 | `removeStoreItem` | `catalogItemId` | `{}` | — |
 | `searchPatients` | `text` | `[{ id, name }]` from the provider's practice | — |
 | `startOrder` | `patientId` or `fromOrderRef` | `{ ref }` | `PATIENT_NOT_IN_PRACTICE`, `STORE_EMPTY` |
-| `saveDraft` | `ref`, `lines: [{ catalogItemId, quantity, priceCents }` or `{ …, marginCents }]` | `{ lines: [{ …split, rangeError? }], totals }` | `ORDER_NOT_DRAFT`, `QUANTITY_OUT_OF_RANGE`, `ITEM_NOT_IN_STORE` |
-| `sendOrder` | `ref` | `{ link, expiresAt }`. If the order is already sent, returns the same link. | `ORDER_EMPTY`, `LINES_OUT_OF_RANGE` (with the lines) |
+| `saveDraft` | `ref`, `lines: [{ catalogItemId, quantity, priceCents }` or `{ …, marginCents }]` | `{ lines: [{ catalogItemId, quantity, priceCents, split, rangeError? }], totals }`. It replaces the draft's lines. A margin line comes back with the price Pricing found for it. | `ORDER_NOT_DRAFT`, `QUANTITY_OUT_OF_RANGE`, `ITEM_NOT_IN_STORE` |
+| `sendOrder` | `ref` | `{ link, expiresAt }`. If the order is already sent, returns the same link. | `ORDER_EMPTY`, `LINES_OUT_OF_RANGE` with `lines: [{ catalogItemId, code, message }]`, where a line's code is a price code or `ITEM_NOT_IN_STORE` |
 | `newLink` | `ref` | `{ link, expiresAt }` | `PAYMENT_IN_PROGRESS`, `ORDER_NOT_SENT` |
 | `cancelOrder` | `ref` | `{ status: 'cancelled' }` | `PAYMENT_IN_PROGRESS`, `ORDER_FINAL` |
 | `searchOrders` | `text?`, `status?`, `dateField` (`created`, `sent` or `paid`; `created` if left out), `from?`, `to?` (`YYYY-MM-DD`), `cursor?` | `{ rows, footerTotals, nextCursor }` | — |
@@ -592,7 +592,7 @@ flowchart TB
 | Page | Shows | Actions |
 |---|---|---|
 | **Sales** (home) | Headline totals, then the order list with search, filters, and a footer row | The action for each status |
-| **New order** | Patient picker. Once a patient is chosen, that patient's recent orders with Order again. Then lines with quantity, price or margin, "You earn", saving against retail, and totals. | Send, then "Sent to Sam" with Copy link |
+| **New order** | Patient picker. Once a patient is chosen, that patient's recent orders with Order again, and Start order. Choosing a patient creates nothing; Start order or Order again creates the draft, which opens at `orders/[ref]` (D56). Then lines with quantity, price or margin, "You earn", saving against retail, and totals. | Send, then "Sent to Sam" with Copy link |
 | **Order details** | Each line's price, cost, fee and margin; totals; fee rate; times; the audit trail | Copy link, New link, Order again, Cancel order |
 | **My store** | The catalog with cost, lowest price and retail price, plus the provider's items with usual prices | Add, remove, set the usual price, No profit |
 | **Pay page** | The six states ([§6](#6-pay-links)) | Pay |
@@ -652,7 +652,7 @@ The target is **WCAG 2.2 AA**.
   - It sits in a cookie that is `HttpOnly`, `Secure`, `SameSite=Lax`, and expires after 12 hours.
   - Every portal query is limited to that provider. One session can't be cut off before it expires, which we accept for a fake login.
 - **Pay links** are signed and expire, and never appear in logs or `Referer` headers ([§6](#6-pay-links)).
-- **Patient data is minimal.** There is no patient name on the pay page and no product names in links or email subjects. Search text is kept out of URLs and logs.
+- **Patient data is minimal.** There is no patient name on the pay page and no product names in links or email subjects. Search text is kept out of URLs and logs; that includes Next.js's development log of server actions, which is turned off in `next.config.ts`.
 - **A link holder can see and pay for that one order.** Paying only sends money in, so the risk is privacy: product names can hint at health. We accept this for the slice. The next step is a one-time code by SMS before the order is shown (DECISIONS.md, Cut). That would need the patient's phone number from the EHR.
 - **The server computes all money.** Every request is checked with Zod, and the pay action takes no amount.
 - **Secrets are environment variables:** `DATABASE_URL`, `JWT_SECRET`, `LINK_SIGNING_KEY`. None are in the repo.
@@ -736,7 +736,7 @@ The alternatives each lack something:
 | **Golden cases** (`tests/golden/money.cases.ts`) | Money examples with exact answers: $20.00 → $20.16 lowest price, $38.00 → 29¢ fee, 2 × $36.10 → 56¢ fee and $31.64 earned, $36.00 → 27¢ and $15.73. **Frozen once approved.** Changing an expected value means changing a money rule, which needs the user's OK. |
 | **Property tests** (fast-check) | For thousands of random prices and costs: the parts always add up, the margin is never negative at or above the lowest price, the fee always rounds up, and entering a margin lands exactly on it, at the lowest such price |
 | **Integration tests** (real Postgres) | Each database rule refuses bad data. Every row of the Pay "breaks" table behaves as designed. The race test charges exactly once. The sweep settles each test-card outcome. Cancel and Pay at the same moment never leave a paid cancelled order. |
-| **End-to-end** (Playwright) | Each run starts by rebuilding the seed (`seed --reset` on the local app database). The provider builds and sends an order, then the patient pays. axe runs on every page and every pay-page state. A **keyboard-only** run completes the flow. Accessibility-tree snapshots cover the pay-page states. Runs are emulated under a contrast theme and at 320px wide. |
+| **End-to-end** (Playwright) | Each run starts by rebuilding the seed (`seed --reset` on the local app database), and the specs run one at a time, because they share it. The provider builds and sends an order, then the patient pays. axe runs on every page and every pay-page state. A **keyboard-only** run completes the flow. Accessibility-tree snapshots cover the pay-page states. Runs are emulated under a contrast theme and at 320px wide. |
 | **Manual** | One NVDA screen-reader pass on the pay flow, recorded in the report |
 | **Load and drill** | [§2](#load-tests) |
 
@@ -780,7 +780,8 @@ CI runs only on GitHub, and the README links to its runs so graders reading GitL
 | `SSE_HEARTBEAT_MS` / `SSE_MAX_MS` | 15,000 / 300,000 | Same | — |
 | `AUTOSAVE_DEBOUNCE_MS` | 1,000 | Same | — |
 | `PAYMENTS_MODE` | `stub` | `stripe` | Test cards exist only in `stub` |
-| Secrets | `DATABASE_URL` (direct connection), `JWT_SECRET` (at least 32 characters), `LINK_SIGNING_KEY`, `STUB_STORE_PATH` | Same, minus the stub | Never committed |
+| `APP_URL` | the live URL | the live URL | Where pay links point; `http://localhost:3000` when unset |
+| Secrets | `DATABASE_URL` (direct connection), `JWT_SECRET` and `LINK_SIGNING_KEY` (each at least 32 characters), `STUB_STORE_PATH` | Same, minus the stub | Never committed |
 
 ## 15. Repository layout
 
@@ -791,7 +792,7 @@ src/
     pay/[token]/        page.tsx (six states), events/route.ts (SSE)
     api/health/         route.ts
   server/               business modules; never import Next.js
-    access/ store/ orders/ payments/ reporting/ links/ seed/ config.ts health.ts release.ts
+    access/ store/ orders/ payments/ reporting/ links/ seed/ config.ts context.ts log.ts health.ts release.ts
     ports/              payment-gateway.ts, link-sender.ts, patient-directory.ts
     adapters/           stub-payments/ (own file store), log-link-sender.ts, seeded-patients.ts
     db/                 schema.ts, client.ts, notify.ts (LISTEN/NOTIFY)

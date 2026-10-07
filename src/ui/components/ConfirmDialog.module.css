@@ -1,0 +1,41 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgb(27 27 27 / 0.55);
+}
+
+.modal {
+  width: min(440px, 100%);
+}
+
+.dialog {
+  padding: var(--space-5);
+  border: 2px solid var(--text);
+  border-radius: var(--radius);
+  background: var(--bg);
+  outline: none;
+}
+
+.title {
+  font-size: 1.25rem;
+}
+
+.body {
+  margin: var(--space-3) 0 var(--space-5);
+}
+
+.body p {
+  margin: 0;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

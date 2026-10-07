@@ -15,6 +15,9 @@ for (const file of [".env", ".env.example"]) {
   }
 }
 
+// Status-change logs (pino) would bury test output.
+process.env.LOG_LEVEL ??= "silent";
+
 // A linked git worktree (where `.git` is a file) gets its own test database on
 // the shared test server, so parallel agents never migrate or write the same
 // one (D45). The main checkout and CI keep the database named in the URL.

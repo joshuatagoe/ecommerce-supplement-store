@@ -22,8 +22,11 @@ export type ErrorCode =
   | "ORDER_NOT_SENT"
   | "ORDER_FINAL";
 
+/** A line Send refused (LINES_OUT_OF_RANGE), so the page can mark it. */
+export type LineError = { catalogItemId: string; code: ErrorCode; message: string };
+
 /** `field` is the input's path, such as `lines.0.quantity`, so the page can mark that field. */
-export type ActionError = { code: ErrorCode; message: string; field?: string };
+export type ActionError = { code: ErrorCode; message: string; field?: string; lines?: LineError[] };
 
 /** What every server action returns (§8). */
 export type ActionResult<T extends object = object> = ({ ok: true } & T) | { ok: false; error: ActionError };

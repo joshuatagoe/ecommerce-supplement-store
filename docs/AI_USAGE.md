@@ -174,3 +174,15 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 37. **The AI's first My store page was 543px wide on a 320px phone.** A visually hidden column header inside the scrolling catalog table was positioned against the page instead of the table, so it pushed the page past the scroll region. All 13 browser tests and axe passed. A screenshot and a width measurement caught it; the table wrapper is now the hidden text's containing block, and a new test checks the width at 320px.
 38. **The AI's first "Not saved" message showed in success green.** Caught on the same screenshots; the status now takes its colour from the outcome.
+
+## 2026-10-07 — M3 (New order to Send)
+
+### What worked
+
+- **A scratch database for code that runs its own transactions.** Orders opens, locks and commits its own transactions, which the rolled-back tests from M1 can't hold. Each Orders test file gets a database of its own, so the double-Send race is real: twenty Sends at once on separate connections.
+- **Breaking the code on purpose, again.** Removing the row lock, letting Cancel ignore a pending payment, and skipping Send's range check each turned exactly one test red.
+
+### Where AI misled us or we course-corrected
+
+39. **The AI's first patient picker never opened.** Search results arrived after the typing that should have opened the list, and React Aria doesn't open a closed list when its items change. The browser tests caught it; the list now opens as soon as typing starts and says "Searching…" until results come back.
+40. **Next.js 16 logs every server action with its arguments in development,** so patient search text ("Sam") appeared in the dev server's terminal. That breaks §10's rule that search text never reaches a log. Found by reading the dev log while debugging item 39; `logging.serverFunctions` is now off.

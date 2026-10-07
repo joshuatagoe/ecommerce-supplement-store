@@ -1,0 +1,125 @@
+.intro {
+  color: var(--text-muted);
+  margin: var(--space-2) 0 var(--space-5);
+}
+
+.empty {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px dashed var(--input-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.combo {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 420px;
+}
+
+.label {
+  font-weight: 700;
+}
+
+.description {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+}
+
+.input {
+  min-height: var(--target);
+  padding: 0 var(--space-3);
+  border: 2px solid var(--input-border);
+  border-radius: var(--radius);
+}
+
+.popover {
+  width: var(--trigger-width);
+  border: 2px solid var(--input-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 4px 12px rgb(27 27 27 / 0.15);
+}
+
+.listbox {
+  max-height: 280px;
+  overflow: auto;
+  outline: none;
+}
+
+.option {
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--target);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  outline: none;
+}
+
+.option[data-focused],
+.option[data-hovered] {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.none {
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--text-muted);
+}
+
+.error {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--error);
+  border-radius: var(--radius);
+  background: var(--error-tint);
+  color: var(--error);
+  font-weight: 600;
+}
+
+.patient {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.patient h2 {
+  margin-bottom: var(--space-3);
+}
+
+.recentHeading {
+  margin-top: var(--space-5);
+  font-size: 1.125rem;
+}
+
+.quiet {
+  color: var(--text-muted);
+}
+
+.recent {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recentRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.recentRow > :last-child {
+  margin-left: auto;
+}
+
+.ref {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}

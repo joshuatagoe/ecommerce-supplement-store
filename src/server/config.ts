@@ -20,3 +20,25 @@ export function jwtSecret(): string {
   if (!secret) throw new Error("JWT_SECRET is not set");
   return secret;
 }
+
+/** Signs pay links (D25). Changing it turns off every live link. */
+export function linkSigningKey(): string {
+  const key = process.env.LINK_SIGNING_KEY;
+  if (!key) throw new Error("LINK_SIGNING_KEY is not set");
+  return key;
+}
+
+/** Where pay links point: the site's own address. */
+export function appUrl(): string {
+  return process.env.APP_URL || "http://localhost:3000";
+}
+
+/** How long a pay link can start a payment (§6). */
+export function linkTtlDays(): number {
+  return whole("LINK_TTL_DAYS", 30);
+}
+
+/** The pause after typing before a draft saves itself (§9). */
+export function autosaveDebounceMs(): number {
+  return whole("AUTOSAVE_DEBOUNCE_MS", 1000);
+}

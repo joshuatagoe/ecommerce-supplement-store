@@ -14,4 +14,7 @@ if (process.env.NODE_ENV !== "production") cache.pool = pool;
 /** What every module takes, so a test can pass one bound to its own rolled-back transaction. */
 export type Db = NodePgDatabase<typeof schema>;
 
+/** Inside `db.transaction(async (tx) => …)`. */
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 export const db: Db = drizzle(pool, { schema });

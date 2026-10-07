@@ -1,0 +1,34 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+.badge[data-status="sent"] {
+  color: var(--primary);
+  background: var(--bg);
+}
+
+.badge[data-status="expired"],
+.badge[data-status="needs_review"] {
+  color: var(--warning);
+  background: var(--warning-tint);
+}
+
+.badge[data-status="paid"] {
+  color: var(--success);
+  background: var(--success-tint);
+}
+
+.badge[data-status="draft"] {
+  color: var(--info);
+  background: var(--info-tint);
+}
