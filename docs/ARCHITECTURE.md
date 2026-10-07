@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D62). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D66). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -508,7 +508,7 @@ Every write below happens in **one transaction**. "Access" means the provider's 
 
 | Action | Browser sends | Server path | Writes | Returns |
 |---|---|---|---|---|
-| Sign in (fake) | provider | Access | — (sets the cookie) | Redirect to Sales (My store until Sales lands in M5) |
+| Sign in (fake) | provider | Access | — (sets the cookie) | Redirect to Sales |
 | Set a usual price | item, price | Access → Store → Pricing | `store_items` | The saved price, "You earn", the saving |
 | Start an order / Order again | patient, or the past order's ref | Access → Orders | `orders` (draft), `order_lines` (copied), event | Order ref |
 | Edit a draft (autosave) | lines: item, quantity, price or margin | Access → Orders → Pricing | `order_lines`, event "price changed" | Each line's split, with out-of-range lines flagged |
@@ -555,7 +555,7 @@ Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, messag
   - `applied` is how many migrations the database has, and `latest` the newest of them that this build knows (`null` if the database has one this build doesn't).
   - `milestone` is the latest milestone in the build. Each milestone's commit updates it in `src/server/release.ts`.
   - `commit` is the deployed commit from Render's `RENDER_GIT_COMMIT`, and `null` off Render.
-- Commands: `npm run setup`, `seed`, `reconcile`, `sweep`, `verify`, `verify:full`, `push`, `smoke`, `load:l1`, `load:l2`, `load:l3`, `drill:outage`.
+- Commands: `npm run setup`, `seed`, `reconcile`, `metrics` (D65), `sweep`, `verify`, `verify:full`, `push`, `smoke`, `load:l1`, `load:l2`, `load:l3`, `drill:outage`.
 
 ### Sales list: search, filters and totals
 
@@ -570,11 +570,11 @@ One list shows every order the provider has created (D31):
 | Paid | Order again |
 | Cancelled | Order again |
 
-- **Search** by patient name or order ref. The search text is sent in the request body, never in the URL or the logs, because clinic computers are shared.
+- **Search** by patient name (any part of the full name) or order ref (its start). The search text is sent in the request body, never in the URL or the logs, because clinic computers are shared.
 - **Filters:** status, and a date range on **created, sent or paid** date, in the practice's time zone. These can live in the URL.
-- **Order and paging:** newest first by the chosen date, 25 to a page. The result count is announced ("12 orders").
+- **Order and paging:** newest first by the chosen date, with orders that don't have it yet last; 25 at a time, with "Show more orders" (D64). The result count is announced ("12 orders").
 - **Headline totals:** this month so far, **by paid date in the practice's time zone**, ignoring filters. October means paid in October.
-- **A footer row adds up the paid orders currently shown.** "Paid orders in this view: 1 · $36.00 · earned $15.73 · fees $0.27." When none are paid it says "No paid orders in this view."
+- **A footer row adds up the paid orders in the view:** every paid order matching the filters and search, including any not yet shown (D63). "Paid orders in this view: 1 · $36.00 · earned $15.73 · fees $0.27." When none are paid it says "No paid orders in this view."
 - **Platform-wide totals use UTC.** An order paid at 10pm Pacific on October 31 counts as October in Dr. Rivera's Sales but as November in the platform totals, so the two don't add up month by month.
 
 ## 9. Frontend

@@ -22,8 +22,8 @@ async function sentLink(browser: Browser): Promise<{ path: string; ref: string }
   const page = await context.newPage();
   await page.goto("/sign-in");
   await page.getByRole("button", { name: "Sign in as Dr. Rivera" }).click();
-  await expect(page).toHaveURL(/\/store$/);
-  await page.getByRole("link", { name: "New order" }).click();
+  await expect(page).toHaveURL(/\/sales$/);
+  await page.getByRole("link", { name: "New order", exact: true }).click();
   await page.getByRole("combobox", { name: "Patient" }).fill("Sam");
   await page.getByRole("option", { name: "Sam Okafor" }).click();
   await page.getByRole("button", { name: "Start order for Sam Okafor" }).click();

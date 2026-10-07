@@ -19,7 +19,7 @@ export async function signIn(_previous: ActionResult | null, form: FormData): Pr
     };
   }
   (await cookies()).set(SESSION_COOKIE, await signSession(provider.id, jwtSecret()), SESSION_COOKIE_OPTIONS);
-  redirect("/store");
+  redirect("/sales");
 }
 
 export async function signOut(): Promise<void> {

@@ -1,12 +1,13 @@
 "use client";
 
-// A sent order (or one past Send): its status, its link with Copy link, and
-// the actions its status allows (§8). The full split and the audit trail are
-// Order details (M5).
+// Order details (§8, F5) for an order past Send: its status, its link with
+// Copy link, the actions its status allows, where every cent went, the times,
+// the payment reference, and the audit trail.
 import { useState, useTransition } from "react";
 import { Button } from "react-aria-components";
 import type { OrderView } from "@/server/orders";
-import { formatDate } from "@/shared/dates";
+import type { AuditEvent } from "@/server/reporting";
+import { formatDate, formatDateTime } from "@/shared/dates";
 import { formatCents } from "@/shared/money";
 import { ConfirmDialog } from "@/ui/components/ConfirmDialog";
 import { ProductImage } from "@/ui/components/ProductImage";
@@ -14,7 +15,44 @@ import { StatusBadge } from "@/ui/components/StatusBadge";
 import { cancelOrderAction, newLinkAction, orderAgainAction } from "./actions";
 import styles from "./order.module.css";
 
-type Props = { order: OrderView; notice?: string; timeZone: string };
+type Props = {
+  order: OrderView;
+  audit: { events: AuditEvent[]; chargeRef: string | null } | null;
+  notice?: string;
+  timeZone: string;
+};
+
+/** One line per audit event, in the words the rest of the portal uses (§4). */
+function describe(event: AuditEvent, order: OrderView): string {
+  const by = event.actorName ? ` by ${event.actorName}` : "";
+  const details = event.details ?? {};
+  switch (event.kind) {
+    case "created":
+      return details.fromRef ? `Draft started${by}, from order ${details.fromRef}` : `Draft started${by}`;
+    case "price_changed": {
+      const line = order.lines.find((l) => l.catalogItemId === details.catalogItemId);
+      return `Price changed${by}: ${line?.name ?? "an item"}, ${formatCents(Number(details.fromCents))} to ${formatCents(Number(details.toCents))}`;
+    }
+    case "sent":
+      return `Sent${by}`;
+    case "link_sent":
+      return "Link sent to the patient (email is stubbed in this demo)";
+    case "new_link":
+      return `New link made${by}; the old link stopped working`;
+    case "needs_review":
+      return "Needs review: the payment company didn't give a clear answer";
+    case "paid":
+      return details.settledBy === "sweep" ? "Paid, confirmed by the payment check" : "Paid by the patient";
+    case "payment_not_charged":
+      return "A payment didn't go through; the patient wasn't charged";
+    case "cancelled":
+      return `Order cancelled${by}`;
+    case "draft_discarded":
+      return `Draft discarded${by}`;
+    default:
+      return event.kind;
+  }
+}
 
 /** One verb per action (§4): Send → "Sent", Cancel order → "Order cancelled", Discard draft → "Draft discarded". */
 function noticeText(notice: string | undefined, order: OrderView): string | null {
@@ -32,7 +70,7 @@ function noticeText(notice: string | undefined, order: OrderView): string | null
   }
 }
 
-export function OrderSummary({ order, notice, timeZone }: Props) {
+export function OrderSummary({ order, audit, notice, timeZone }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -144,10 +182,12 @@ export function OrderSummary({ order, notice, timeZone }: Props) {
         </div>
       )}
 
-      <section aria-labelledby="lines-heading" className={styles.section}>
-        <h2 id="lines-heading">Items</h2>
-        <div className={styles.tableWrap} role="region" aria-labelledby="lines-heading" tabIndex={0}>
+      <section aria-labelledby="money-heading" className={styles.section}>
+        <h2 id="money-heading">Where the money goes</h2>
+        <p className={styles.muted}>Each price is our cost, plus the fee, plus what you earn.</p>
+        <div className={styles.tableWrap} role="region" aria-labelledby="money-heading" tabIndex={0}>
           <table className={styles.table}>
+            <caption className="visually-hidden">Where the money goes</caption>
             <thead>
               <tr>
                 <th scope="col">Product</th>
@@ -158,7 +198,10 @@ export function OrderSummary({ order, notice, timeZone }: Props) {
                   Price
                 </th>
                 <th scope="col" className={styles.num}>
-                  Total
+                  Our cost
+                </th>
+                <th scope="col" className={styles.num}>
+                  Fee
                 </th>
                 <th scope="col" className={styles.num}>
                   You earn
@@ -173,29 +216,57 @@ export function OrderSummary({ order, notice, timeZone }: Props) {
                       <ProductImage src={line.imagePath} alt="" size={36} />
                       <span>
                         {line.name}
-                        <span className={styles.muted}>{line.sizeLabel}</span>
+                        <span className={styles.muted}>
+                          {line.sizeLabel}
+                          {line.quantity > 1 ? ` · ${formatCents(line.priceCents)} each` : ""}
+                        </span>
                       </span>
                     </span>
                   </th>
                   <td className={styles.num}>{line.quantity}</td>
-                  <td className={styles.num}>{formatCents(line.priceCents)}</td>
                   <td className={styles.num}>{formatCents(line.split.priceCents)}</td>
+                  <td className={styles.num}>{formatCents(line.split.costCents)}</td>
+                  <td className={styles.num}>{formatCents(line.split.feeCents)}</td>
                   <td className={styles.num}>{formatCents(line.split.marginCents)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <th scope="row" colSpan={3}>
+                <th scope="row" colSpan={2}>
                   Order total
                 </th>
                 <td className={styles.num}>{formatCents(order.totals.priceCents)}</td>
+                <td className={styles.num}>{formatCents(order.totals.costCents)}</td>
+                <td className={styles.num}>{formatCents(order.totals.feeCents)}</td>
                 <td className={styles.num}>{formatCents(order.totals.marginCents)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
+        <ul className={styles.facts}>
+          <li>Fee rate: {(order.feeRateBps / 100).toFixed(2)}%</li>
+          <li>Created: {formatDateTime(order.createdAt, timeZone)}</li>
+          {order.sentAt && <li>Sent: {formatDateTime(order.sentAt, timeZone)}</li>}
+          {order.paidAt && <li>Paid: {formatDateTime(order.paidAt, timeZone)}</li>}
+          {order.cancelledAt && <li>Cancelled: {formatDateTime(order.cancelledAt, timeZone)}</li>}
+          {audit?.chargeRef && <li>Payment reference: {audit.chargeRef}</li>}
+        </ul>
       </section>
+
+      {audit && (
+        <section aria-labelledby="audit-heading" className={styles.section}>
+          <h2 id="audit-heading">Audit trail</h2>
+          <ol className={styles.audit} aria-label="Audit trail">
+            {audit.events.map((event, index) => (
+              <li key={index}>
+                <time dateTime={new Date(event.at).toISOString()}>{formatDateTime(event.at, timeZone)}</time>
+                <span>{describe(event, order)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
     </>
   );
 }

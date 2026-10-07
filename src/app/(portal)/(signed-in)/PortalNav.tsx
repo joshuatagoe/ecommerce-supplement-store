@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import styles from "./portal.module.css";
 
 const LINKS = [
+  { href: "/sales", label: "Sales" },
   { href: "/orders/new", label: "New order" },
   { href: "/store", label: "My store" },
 ];

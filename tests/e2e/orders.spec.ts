@@ -9,11 +9,11 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 async function signIn(page: Page, name = "Dr. Rivera") {
   await page.goto("/sign-in");
   await page.getByRole("button", { name: `Sign in as ${name}` }).click();
-  await expect(page).toHaveURL(/\/store$/);
+  await expect(page).toHaveURL(/\/sales$/);
 }
 
 async function choosePatient(page: Page, typed = "Sam", name = "Sam Okafor") {
-  await page.getByRole("link", { name: "New order" }).click();
+  await page.getByRole("link", { name: "New order", exact: true }).click();
   await expect(page.getByRole("heading", { name: "New order", level: 1 })).toBeVisible();
   await page.getByRole("combobox", { name: "Patient" }).fill(typed);
   await page.getByRole("option", { name }).click();
@@ -187,7 +187,7 @@ test("axe finds no problems on New order, a draft, and a sent order", async ({ p
 
 test("keyboard only: choose a patient, add an item, and send", async ({ page }) => {
   await signIn(page);
-  await tabTo(page, page.getByRole("link", { name: "New order" }));
+  await tabTo(page, page.getByRole("link", { name: "New order", exact: true }));
   await page.keyboard.press("Enter");
   const patient = page.getByRole("combobox", { name: "Patient" });
   await tabTo(page, patient);
@@ -224,13 +224,15 @@ test.describe("with an empty store", () => {
 
   test("New order sends the provider to My store first (F1)", async ({ page }) => {
     await signIn(page, "Dr. Patel");
+    await page.getByRole("link", { name: "My store" }).click();
+    await expect(page.getByRole("heading", { name: "My store", level: 1 })).toBeVisible();
     const remove = page.getByRole("button", { name: "Remove" });
     while ((await remove.count()) > 0) {
       const before = await remove.count();
       await remove.first().click();
       await expect(remove).toHaveCount(before - 1);
     }
-    await page.getByRole("link", { name: "New order" }).click();
+    await page.getByRole("link", { name: "New order", exact: true }).click();
     await expect(page.getByText("Your store is empty. Add items in My store before you start an order.")).toBeVisible();
     await page.getByRole("main").getByRole("link", { name: "My store" }).click();
     await expect(page).toHaveURL(/\/store$/);

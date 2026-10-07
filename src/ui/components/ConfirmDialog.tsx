@@ -13,13 +13,15 @@ type Props = {
   keepLabel: string;
   onConfirm: () => void;
   isDisabled?: boolean;
+  /** Names the trigger when several sit on one page, e.g. "Cancel order: K7Q2-M9XD". Starts with the action's verb. */
+  triggerLabel?: string;
 };
 
 /** A question before an action that can't be undone. Focus stays inside until it closes, and Escape keeps things as they were. */
-export function ConfirmDialog({ action, title, children, keepLabel, onConfirm, isDisabled }: Props) {
+export function ConfirmDialog({ action, title, children, keepLabel, onConfirm, isDisabled, triggerLabel }: Props) {
   return (
     <DialogTrigger>
-      <Button className="button" isDisabled={isDisabled}>
+      <Button className="button" isDisabled={isDisabled} aria-label={triggerLabel}>
         {action}
       </Button>
       <ModalOverlay className={styles.overlay}>

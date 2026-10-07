@@ -415,3 +415,33 @@
     justify-self: start;
   }
 }
+
+.facts {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  font-size: 0.9375rem;
+}
+
+.audit {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 3px solid var(--border);
+}
+
+.audit li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.audit time {
+  min-width: 11rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

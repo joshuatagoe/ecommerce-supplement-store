@@ -199,3 +199,14 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 41. **The AI's first axe checks ran before Next.js 16 had streamed the new page's `<title>`.** A dynamic page's title arrives after its content, so axe sometimes saw a page with no title. The checks now wait for the title. It's a test timing problem, not a page defect: the title is always there once the page settles.
 42. **The AI's tests looked for one `role="alert"` and found two.** Next.js adds a route announcer with that role. The tests now look for the alert by its text.
+
+## 2026-10-07 — M5 (Sales, Order details, reconcile, metrics)
+
+### What worked
+
+- **Building the reporting dataset through the real code with the clock set (D57).** A payment at 10pm Pacific on October 31 lands in October in the practice's Sales and in November in the UTC metrics, and both tests check it. Swapping the practice's time zone for UTC turned exactly those two tests red.
+
+### Where AI misled us or we course-corrected
+
+43. **The AI first put the helper that signs pay links in a `"use server"` file.** Every export of such a file can be called from the browser, so anyone signed in could have asked it to sign a link for any ref. Caught while writing the Sales page, before it ever ran; the helper now lives in a plain server module.
+44. **The AI's browser tests asked for the "New order" link and found two.** Playwright matches names by substring, and the empty Sales page's "Start a new order" link matched too. The tests now ask for the exact name. One test also counted My store's Remove buttons before the page had loaded, so it removed nothing; it now waits for the page.

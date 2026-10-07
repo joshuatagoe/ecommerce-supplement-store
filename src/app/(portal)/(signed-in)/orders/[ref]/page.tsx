@@ -4,6 +4,7 @@ import { autosaveDebounceMs } from "@/server/config";
 import { ordersContext } from "@/server/context";
 import { db } from "@/server/db/client";
 import { getOrder } from "@/server/orders";
+import { orderAudit } from "@/server/reporting";
 import { listStoreItems } from "@/server/store";
 import { REF_PATTERN } from "@/shared/schemas";
 import { requireProvider } from "../../../session";
@@ -38,5 +39,6 @@ export default async function OrderPage({ params, searchParams }: Props) {
     );
   }
   const { notice } = await searchParams;
-  return <OrderSummary order={order} notice={notice} timeZone={provider.timeZone} />;
+  const audit = await orderAudit(ctx, provider, ref);
+  return <OrderSummary order={order} audit={audit} notice={notice} timeZone={provider.timeZone} />;
 }

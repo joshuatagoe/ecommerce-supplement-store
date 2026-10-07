@@ -9,6 +9,9 @@ import { UnsecuredJWT } from "jose";
 async function signIn(page: Page, name = "Dr. Rivera") {
   await page.goto("/sign-in");
   await page.getByRole("button", { name: `Sign in as ${name}` }).click();
+  // Signing in opens Sales (M5); these tests work in My store.
+  await expect(page).toHaveURL(/\/sales$/);
+  await page.getByRole("link", { name: "My store" }).click();
   await expect(page).toHaveURL(/\/store$/);
 }
 
@@ -143,6 +146,9 @@ test("axe finds no problems on sign-in or My store", async ({ page }) => {
 test("keyboard only: sign in, set a price and save", async ({ page }) => {
   await page.goto("/sign-in");
   await tabTo(page, page.getByRole("button", { name: "Sign in as Dr. Rivera" }));
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/sales$/);
+  await tabTo(page, page.getByRole("link", { name: "My store" }));
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/store$/);
 
