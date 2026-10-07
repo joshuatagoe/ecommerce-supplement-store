@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D68). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D70). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -761,9 +761,9 @@ flowchart LR
 | GitHub CI | Everything in `verify`, plus Playwright (end-to-end, axe, keyboard) and the README number check | "Works on my machine" problems and accessibility regressions |
 | Branch protection | `main` accepts only merges whose CI passed, admins included | Untested code reaching production |
 | Render health check | A new version gets traffic only after `/api/health` passes | A version that can't start. The old version keeps serving. |
-| `npm run smoke` | Against the live URL: health, a seeded pay link loads, the portal login works. Allows 2 minutes for Render Free to wake. | Production-only mistakes, such as a wrong signing key |
+| `npm run smoke` | Against the live URL: waits for the expected commit, then checks health, that the portal login works, and that a seeded pay link loads (copied through the portal, so it needs no key). Allows 2 minutes for Render Free to wake. Read only. It also runs in GitHub Actions after every merge to `main`, waiting up to 15 minutes for Render to deploy (D69). | Production-only mistakes, such as a wrong signing key |
 
-CI runs only on GitHub, and the README links to its runs so graders reading GitLab can find them. The Render deploy and its health-check path are set up in M0, and branch protection in M7, each with the user's approval.
+CI runs only on GitHub, and the README links to its runs so graders reading GitLab can find them. The Render deploy and its health-check path are set up in M0, and branch protection in M7, each with the user's approval. Since M7 every change reaches `main` through a pull request whose CI passed, merged with `--rebase`; `main` is then pushed to GitLab (D70).
 
 **Demo video:** a slowed-down Playwright script drives the demo (`slowMo`) while the user records and narrates. The slow-approve outage scene runs on the laptop.
 
