@@ -17,5 +17,12 @@ test("the health check reports a migrated database", async ({ request }) => {
   const response = await request.get("/api/health");
   expect(response.status()).toBe(200);
   expect(response.headers()["x-robots-tag"]).toBe("noindex");
-  expect(await response.json()).toEqual({ ok: true, db: "up", migrations: "current" });
+  expect(await response.json()).toMatchObject({
+    ok: true,
+    db: "up",
+    migrations: "current",
+    applied: 4,
+    latest: "0003_money_core_gaps",
+    milestone: expect.stringMatching(/^(S1|M\d)$/),
+  });
 });

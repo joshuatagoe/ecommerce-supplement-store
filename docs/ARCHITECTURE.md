@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D50). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D52). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -525,7 +525,7 @@ Every write below happens in **one transaction**. "Access" means the provider's 
 
 ### Contracts
 
-Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, message, field? } }`. Messages are written for the user, in the wording [USERS.md](USERS.md) gives.
+Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, message, field? } }`. Messages are written for the user, in the wording [USERS.md](USERS.md) gives. Every input is checked by its Zod schema in `src/shared/schemas.ts` first, so any action can also return `INVALID_INPUT` (or `QUANTITY_OUT_OF_RANGE`) with the field it belongs to, such as `lines.0.quantity`. An order that isn't the provider's returns `NOT_FOUND`, the same as one that doesn't exist.
 
 **Provider portal** (needs the JWT cookie; every query is limited to that provider):
 
@@ -540,7 +540,7 @@ Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, messag
 | `sendOrder` | `ref` | `{ link, expiresAt }`. If the order is already sent, returns the same link. | `ORDER_EMPTY`, `LINES_OUT_OF_RANGE` (with the lines) |
 | `newLink` | `ref` | `{ link, expiresAt }` | `PAYMENT_IN_PROGRESS`, `ORDER_NOT_SENT` |
 | `cancelOrder` | `ref` | `{ status: 'cancelled' }` | `PAYMENT_IN_PROGRESS`, `ORDER_FINAL` |
-| `searchOrders` | `text?`, `status?`, `dateField` (`created`, `sent` or `paid`), `from`, `to`, `cursor?` | `{ rows, footerTotals, nextCursor }` | — |
+| `searchOrders` | `text?`, `status?`, `dateField` (`created`, `sent` or `paid`; `created` if left out), `from?`, `to?` (`YYYY-MM-DD`), `cursor?` | `{ rows, footerTotals, nextCursor }` | — |
 
 **Patient** (no login; the link signature is the credential):
 
@@ -551,7 +551,10 @@ Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, messag
 | `GET /pay/[token]/events` | `text/event-stream`. `event: status` with `data: {"state": "paid"}`. The first event is the current state. A `: ping` every 15 s. Closes after 5 minutes. |
 
 **Operations:**
-- `GET /api/health` returns `200 { ok: true, db: "up", migrations: "current" }`, or 503.
+- `GET /api/health` returns `200 { ok: true, db: "up", migrations: "current", applied: 4, latest: "0003_money_core_gaps", milestone: "S1", commit: "c3eee65" }`, or 503 with the same fields (D51). It also says which build is answering:
+  - `applied` is how many migrations the database has, and `latest` the newest of them that this build knows (`null` if the database has one this build doesn't).
+  - `milestone` is the latest milestone in the build. Each milestone's commit updates it in `src/server/release.ts`.
+  - `commit` is the deployed commit from Render's `RENDER_GIT_COMMIT`, and `null` off Render.
 - Commands: `npm run setup`, `seed`, `reconcile`, `sweep`, `verify`, `verify:full`, `push`, `smoke`, `load:l1`, `load:l2`, `load:l3`, `drill:outage`.
 
 ### Sales list: search, filters and totals
@@ -597,7 +600,7 @@ flowchart TB
 **Rules:**
 - **The server owns every amount and status. The browser owns only what's being typed.** "You earn" is computed by the shared Pricing module while the provider types, and the autosave response then replaces it with the server's split. If they ever differ, the server wins and the mismatch is logged as a bug.
 - **The pay page is built on the server first.** The order is readable before any script loads, which matters on old phones. A small script adds card formatting and SSE. The page makes no requests to other sites: we host the fonts ourselves and send no `Referer` header.
-- **The status words live only in `StatusBadge`.** Each word is paired with an icon and is never shown by colour alone.
+- **The status words come only from `src/shared/status.ts`, and only `StatusBadge` shows them.** Each word is paired with an icon and is never shown by colour alone. The same file works out Expired, the Sales actions and the pay-page state.
 - **Autosave never re-renders the field being typed in.** It shows "Saving…", "Saved", or "Not saved, retrying".
 - **Hard widgets use React Aria Components:** the patient picker combobox, the Cancel order dialog, the price-or-margin radio group, and the quantity field.
 
@@ -659,7 +662,7 @@ The target is **WCAG 2.2 AA**.
 
 - **Logs:** pino writes structured JSON, with patient fields redacted. Each request gets a request ID.
 - **One log line per status change**, with the order ref, the old and new status, and the actor. No patient data.
-- **Health:** `GET /api/health` checks the database connection and the migration version. Render uses it to decide whether a new deploy gets traffic.
+- **Health:** `GET /api/health` checks the database connection and the migration version, and names the milestone and commit it serves. Render uses it to decide whether a new deploy gets traffic; the smoke test uses the commit to know the new build is live.
 - **Totals always come from the database,** never from a cache.
 - **Reconciliation** runs as a command, in CI on the seeded data, and after every load test.
 
@@ -793,6 +796,7 @@ src/
     adapters/           stub-payments/ (own file store), log-link-sender.ts, seeded-patients.ts
     db/                 schema.ts, client.ts, notify.ts (LISTEN/NOTIFY)
   shared/               runs in the browser and on the server: pricing/, money.ts, status.ts, schemas.ts
+                        (server/ and shared/ import each other by relative path with the .ts extension, D52)
   ui/                   components/, tokens.css, fonts/
 instrumentation.ts      starts the sweep (Node runtime only)
 drizzle/                SQL migrations (committed)

@@ -23,6 +23,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { ATTEMPT_STATUSES, ORDER_STATUSES } from "../../shared/status.ts";
 
 const id = () => uuid("id").primaryKey().default(sql`uuidv7()`);
 const at = (name: string) => timestamp(name, { withTimezone: true });
@@ -96,8 +97,8 @@ export const storeItems = pgTable(
   ],
 );
 
-export const ORDER_STATUSES = ["draft", "sent", "needs_review", "paid", "cancelled"] as const;
-export const ATTEMPT_STATUSES = ["pending", "succeeded", "declined", "failed"] as const;
+// The status words are shared with the browser (src/shared/status.ts).
+export { ATTEMPT_STATUSES, ORDER_STATUSES };
 export const SETTLED_BY = ["request", "sweep"] as const;
 export const ACTOR_TYPES = ["provider", "patient", "sweep", "system"] as const;
 
