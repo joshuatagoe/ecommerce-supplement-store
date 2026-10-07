@@ -37,7 +37,7 @@ async function insertDraft(db: Db, clinic: Clinic, overrides: Row = {}): Promise
   return accepted(db, insertInto("orders", draftOrder(clinic, overrides)));
 }
 
-/** A sent order with no lines yet, for tests that write their own frozen line. */
+/** A sent order with no lines, for rules that only need the order row. */
 async function insertSent(db: Db, clinic: Clinic, overrides: Row = {}): Promise<Row> {
   return accepted(db, insertInto("orders", sentOrder(clinic, overrides)));
 }
@@ -176,7 +176,7 @@ describe("money is whole cents and never negative", () => {
   it(
     "keeps fee rates within 0–10,000 bps",
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       for (const [table, row] of [
         ["orders", sentOrder(clinic)],
         ["order_lines", draftLine(order.id, clinic.magnesiumId)],
@@ -193,7 +193,7 @@ describe("a frozen line adds up", () => {
   it(
     "refuses cost + fee + margin that isn't the price",
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       await expectAccepted(db, insertInto("order_lines", frozenLine(order.id, clinic.magnesiumId)));
       await expectRefused(
         db,
@@ -228,7 +228,7 @@ describe("a frozen line adds up", () => {
     "image_alt",
   ])("refuses a frozen line with no %s, which would let the sums pass unchecked", (column) =>
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       await expectRefused(
         db,
         insertInto("order_lines", frozenLine(order.id, clinic.magnesiumId, { [column]: null })),
@@ -245,7 +245,7 @@ describe("a frozen line's fee is right", () => {
   it(
     "refuses a fee rounded down or overcharged, even when the parts add up",
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       const line = (fee: number) =>
         frozenLine(order.id, clinic.magnesiumId, { ...at3800, unit_fee_cents: fee, unit_margin_cents: 3800 - 2000 - fee });
       await expectAccepted(db, insertInto("order_lines", line(29)));
@@ -257,7 +257,7 @@ describe("a frozen line's fee is right", () => {
   it(
     "computes the fee without overflowing on large prices",
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       // $20M × 10,000 bps is past the 32-bit integer range mid-calculation.
       const price = 2_000_000_000;
       await expectAccepted(
@@ -289,7 +289,7 @@ describe("a frozen line is in range", () => {
   it(
     "accepts the lowest price and MSRP",
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       await expectAccepted(db, insertInto("order_lines", frozenLine(order.id, clinic.magnesiumId, priced(2016, 16))));
       await expectAccepted(db, insertInto("order_lines", frozenLine(order.id, clinic.magnesiumId, priced(4000, 30))));
     }),
@@ -298,7 +298,7 @@ describe("a frozen line is in range", () => {
   it(
     "refuses 1¢ above MSRP",
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       await expectRefused(
         db,
         insertInto("order_lines", frozenLine(order.id, clinic.magnesiumId, priced(4001, 31))),
@@ -310,7 +310,7 @@ describe("a frozen line is in range", () => {
   it(
     "refuses 1¢ below the lowest price, where the margin is -1¢",
     withClinic(async (db, clinic) => {
-      const order = await insertSent(db, clinic);
+      const order = await insertDraft(db, clinic);
       await expectRefused(
         db,
         insertInto("order_lines", frozenLine(order.id, clinic.magnesiumId, priced(2015, 16))),
@@ -349,6 +349,23 @@ describe("a frozen line never changes", () => {
       // Send freezes a line by filling its frozen columns in one update.
       await accepted(db, update("order_lines", { id: line.id }, frozenLine(order.id, clinic.magnesiumId)));
       await expectRefused(db, update("order_lines", { id: line.id }, { quantity: 3 }), "order_lines_frozen_never_change");
+    }),
+  );
+});
+
+describe("lines are added only to drafts", () => {
+  it(
+    "refuses a new line, frozen or not, on a sent or discarded order",
+    withClinic(async (db, clinic) => {
+      const rule = "order_lines_only_on_drafts";
+      const sent = await seedSentOrder(db, clinic);
+      await expectRefused(db, insertInto("order_lines", draftLine(sent.id, clinic.vitaminDId)), rule);
+      await expectRefused(db, insertInto("order_lines", frozenLine(sent.id, clinic.vitaminDId)), rule);
+      const discarded = await insertDraft(db, clinic, { status: "cancelled", cancelled_at: new Date() });
+      await expectRefused(db, insertInto("order_lines", draftLine(discarded.id, clinic.magnesiumId)), rule);
+      // A draft still takes lines, which is how Order again copies them.
+      const draft = await insertDraft(db, clinic);
+      await expectAccepted(db, insertInto("order_lines", draftLine(draft.id, clinic.magnesiumId)));
     }),
   );
 });
@@ -471,6 +488,27 @@ describe("paid means a real payment", () => {
       const paid = (paidAttemptId: unknown) => ({ status: "paid", paid_at: new Date(), paid_attempt_id: paidAttemptId });
       await expectRefused(db, update("orders", where, paid(othersAttempt.id)), "orders_paid_attempt_fk");
       await expectRefused(db, update("orders", where, paid("01900000-0000-7000-8000-000000000000")), "orders_paid_attempt_fk");
+    }),
+  );
+
+  it(
+    "refuses paid with an attempt that didn't succeed, and un-succeeding the attempt an order was paid with",
+    withClinic(async (db, clinic) => {
+      const rule = "orders_paid_attempt_succeeded";
+      const order = await seedSentOrder(db, clinic);
+      const where = { id: order.id };
+      const paid = (attemptId: unknown) => ({ status: "paid", paid_at: new Date(), paid_attempt_id: attemptId });
+      const declined = await accepted(db, insertInto("payment_attempts", payAttempt(order.id, { status: "declined" })));
+      const failed = await accepted(db, insertInto("payment_attempts", payAttempt(order.id, { status: "failed" })));
+      const pending = await accepted(db, insertInto("payment_attempts", payAttempt(order.id)));
+      for (const attempt of [declined, failed, pending]) {
+        await expectRefused(db, update("orders", where, paid(attempt.id)), rule);
+      }
+      // Once it succeeds, the order can be paid with it, and it can't then stop being a success.
+      const settled = { status: "succeeded", charge_ref: "ch_123", settled_by: "request", settled_at: new Date() };
+      await accepted(db, update("payment_attempts", { id: pending.id }, settled));
+      await accepted(db, update("orders", where, paid(pending.id)));
+      await expectRefused(db, update("payment_attempts", { id: pending.id }, { status: "failed" }), rule);
     }),
   );
 });

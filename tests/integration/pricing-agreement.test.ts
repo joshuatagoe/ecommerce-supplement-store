@@ -5,7 +5,7 @@
 import fc from "fast-check";
 import { afterAll, expect, it } from "vitest";
 import { checkPrice, unitSplit } from "@/shared/pricing";
-import { accepted, frozenLine, insertInto, outcome, rolledBack, seedClinic, sentOrder, testPool } from "./fixtures";
+import { accepted, draftOrder, frozenLine, insertInto, outcome, rolledBack, seedClinic, testPool } from "./fixtures";
 
 const pool = testPool();
 afterAll(() => pool.end());
@@ -16,7 +16,8 @@ const rate = fc.oneof(fc.constant(75), fc.integer({ min: 0, max: 9999 }));
 it("accepts a frozen line exactly when Pricing says its price is in range", () =>
   rolledBack(pool, async (db) => {
     const clinic = await seedClinic(db);
-    const order = await accepted(db, insertInto("orders", sentOrder(clinic)));
+    // Send freezes lines while the order is still a draft (§8).
+    const order = await accepted(db, insertInto("orders", draftOrder(clinic)));
     await fc.assert(
       fc.asyncProperty(cents, cents, cents, rate, async (priceCents, costCents, msrpCents, feeRateBps) => {
         const split = unitSplit({ priceCents, costCents, feeRateBps });

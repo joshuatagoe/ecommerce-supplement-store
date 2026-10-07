@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D48). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D50). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -468,15 +468,25 @@ The database refuses these even if our code has a bug:
 | A frozen line's fee is right | `CHECK (frozen_at IS NULL OR unit_fee_cents = (unit_price_cents * fee_rate_bps + 9999) / 10000)` | Wrong fee arithmetic |
 | A frozen line is in range | `CHECK (frozen_at IS NULL OR (unit_margin_cents >= 0 AND unit_price_cents <= unit_msrp_cents))` | Prices below the lowest or above MSRP |
 | A frozen line never changes | A trigger rejects `UPDATE` and `DELETE` once `frozen_at` is set | Changing a sent order |
+| Lines are added only to drafts | A trigger rejects an `INSERT` into `order_lines` unless the order is a draft (D50) | Slipping a line into a sent order |
 | Order totals add up and never change after Send | `CHECK` on the four totals, plus a trigger | Totals drifting from what Sam saw |
 | One live attempt per order | `CREATE UNIQUE INDEX one_live_attempt_per_order ON payment_attempts (order_id) WHERE status IN ('pending','succeeded')` | Double charges |
 | Each Pay key is used once | A unique index on `idempotency_key` | A double click making two attempts |
 | Paid means a real payment | `CHECK ((status = 'paid') = (paid_attempt_id IS NOT NULL AND paid_at IS NOT NULL))`, plus `FOREIGN KEY (id, paid_attempt_id) REFERENCES payment_attempts (order_id, id)` | "Paid" without a payment for this order |
+| Paid means a payment that succeeded | Triggers: an order's `paid_attempt_id` must be a succeeded attempt, and that attempt can't stop being one (D50) | "Paid" with a declined, failed or pending attempt |
 | A success has a charge reference | `CHECK (status <> 'succeeded' OR charge_ref IS NOT NULL)` on attempts | A success we can't trace |
 | Status and timestamps agree | `CHECK` on the status list. Non-draft, non-cancelled orders have `sent_at`. Cancelled orders have `cancelled_at`. | Impossible states |
 | Each product appears once per order | `UNIQUE (order_id, catalog_item_id)` | Duplicate lines (use quantity instead) |
 | Quantity is 1–10 | `CHECK (quantity BETWEEN 1 AND 10)` | A typo that orders 100 bottles |
 | The audit trail is append-only | A trigger rejects `UPDATE` and `DELETE` on `order_events` | Rewriting history |
+
+**Closed against NULL (D47).** A `CHECK` passes when its expression comes out NULL, so the rules above also require their values once they apply:
+- **A frozen line** has every frozen column.
+- **A sent order** has its fee rate, link version, expiry and four totals.
+- **A draft** has no `sent_at`.
+- **Exactly when the order is in that state:** `cancelled_at` is set when it's cancelled, and `paid_at` and `paid_attempt_id` are each set when it's paid.
+
+Every constraint and trigger is named for its rule. Each trigger raises SQLSTATE 23000 with that name. Migrations 0001 to 0003 hold the exact expressions.
 
 **The reconciliation check** (`npm run reconcile`) covers what the database can't express:
 - Every paid order's totals equal the sum of its lines.
@@ -798,10 +808,7 @@ Each milestone is a vertical slice with a check that proves it. Cards are seeded
 
 **Deployed from M0 (D40).** The skeleton goes live in M0, so each later milestone is checked on the live URL as it lands instead of first at M7.
 
-**Two lanes (D39).** M0 runs alone. M1's two halves, Pricing and the schema with its tests, run in parallel because they share no files. M1 ends by settling the shared contracts: `schema.ts`, `status.ts` and `schemas.ts`. After that:
-- **The server lane** runs ahead in a git worktree: Orders (Send, links, Cancel order), then Payments (the pay action, the stub, the sweep, the "breaks" rows, the race test), then Reporting and `reconcile`.
-- **The UI lane** runs M2 to M6 in order on the main checkout with the one dev server, and plugs into server code that is already built.
-- **A milestone is Done** only when both halves are in and its check below passes. A change to a shared contract after M1 stops both lanes.
+**One agent per milestone (D49, replacing D39's two lanes).** The D43 benchmark built M1's money core four ways. One agent was the most correct, the fastest and the cheapest. So from M2 onward, one agent builds each milestone on the main checkout, one at a time, with the one dev server. Parallel agents are used only for clearly separate, long-running work, and only with a measured reason. M1 settled `schema.ts`; `status.ts` and `schemas.ts` come before M2 (D46).
 
 | # | Milestone | Done when |
 |---|---|---|

@@ -22,6 +22,13 @@
       "when": 1791335023190,
       "tag": "0002_money_core_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791350784348,
+      "tag": "0003_money_core_gaps",
+      "breakpoints": true
     }
   ]
 }

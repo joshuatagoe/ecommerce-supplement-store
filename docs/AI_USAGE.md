@@ -143,3 +143,21 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 30. **§7's rule table had CHECK expressions that pass on NULL.** The AI wrote them in the architecture session. A CHECK that comes out NULL lets the row through, so `frozen_at IS NULL OR unit_cost_cents + … = unit_price_cents` accepts a frozen line with no cost. Likewise, `(status = 'paid') = (paid_attempt_id IS NOT NULL AND paid_at IS NOT NULL)` accepts a sent order with a `paid_at` and no attempt. Found while writing the schema. Closed in D47, which waits for the user.
 31. **drizzle-kit wrote the Sales indexes as `DESC NULLS LAST`.** In Postgres, §7's plain `DESC` means `NULLS FIRST`. Caught by reading the generated SQL instead of trusting it; the schema now asks for `NULLS FIRST` explicitly.
 32. **The AI's first tests missed two cases, and the suite still passed.** No test refused a `link_version` of 0. The fractional-quantity test only threw because its results happened to be fractional, so a Pricing that skipped the quantity check still passed. Both were found by the deliberate breaks above, not by review. Lesson: a suite that passes on its first run proves little until each rule has been broken once.
+
+## 2026-10-07 — D43 results, and closing M1's gaps
+
+### What worked
+
+- **A hidden referee that never saw an arm's code.** Every arm passed all 109 stated tests, and every arm still left two of §7's implied rules open. The referee found both, and both are now rules (D50).
+- **A repeat run of the cheapest setup.** One agent scored the same both times (16 of 18 implied), so the gaps between setups aren't luck.
+- **Testing each new mechanism in a small session before trusting a long run with it:**
+  - a background session waking its lead
+  - a Workflow inside a background session
+  - resuming a stalled session
+
+### Where AI misled us or we course-corrected
+
+33. **The AI's first driver ran the arms with `claude -p`.** Its test session had a lead that waited for its agent, which hid the problem. Under `-p` a session ends when the lead's turn ends, and agents still working are cut off 10 minutes later. Arm 2's first run lost both agents' work that way. The arms were rerun as background sessions (`claude --bg`), which wake the lead when an agent reports back.
+34. **The AI guessed that a Workflow permission prompt had stalled arm 3's first run.** Two test sessions showed that Workflows run without asking. The real cause, a session that made no further request after loading a guide, didn't happen again. The driver now restarts a quiet session up to twice and leaves the hung time out of the arm's time.
+35. **A referee test timed out once while scoring arm 2.** That cost it two stated tests, and a rerun passed them. The scorer now reruns once when the only failures are infrastructure errors (a timeout, or the aborted transaction that follows one). A real bug fails again.
+36. **The AI first resumed a stalled session with its launch flags, which starts a copy under a new ID.** A test caught it. Resuming with no flags wakes the same session, with its saved model, effort and permissions.

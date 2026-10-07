@@ -229,9 +229,13 @@ export function succeededAttempt(orderId: unknown, overrides: Row = {}): Row {
   });
 }
 
-/** A sent order with Sam's frozen line on it. */
+/**
+ * A sent order with Sam's frozen line on it, built the way Send builds it (§8):
+ * the line goes on the draft and is frozen there, then the order is sent.
+ * Lines can't be added once an order isn't a draft.
+ */
 export async function seedSentOrder(db: Db, clinic: Clinic, overrides: Row = {}): Promise<Row> {
-  const order = await accepted(db, insertInto("orders", sentOrder(clinic, overrides)));
-  await accepted(db, insertInto("order_lines", frozenLine(order.id, clinic.magnesiumId)));
-  return order;
+  const draft = await accepted(db, insertInto("orders", draftOrder(clinic)));
+  await accepted(db, insertInto("order_lines", frozenLine(draft.id, clinic.magnesiumId)));
+  return accepted(db, update("orders", { id: draft.id }, { status: "sent", ...sendColumns(), ...overrides }));
 }
