@@ -30,6 +30,12 @@ export function Confirming({ token }: { token: string }) {
 
   return (
     <>
+      <span className={`${styles.mark} ${styles.waitMark}`} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 8v4l2.5 2" />
+        </svg>
+      </span>
       <h1>We&apos;re confirming your payment</h1>
       <p className={styles.lede}>Don&apos;t pay again. This page updates by itself.</p>
       <p className={styles.status} role="status">

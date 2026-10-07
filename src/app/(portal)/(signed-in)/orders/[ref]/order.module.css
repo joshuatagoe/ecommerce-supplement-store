@@ -84,7 +84,12 @@
   align-items: start;
   padding: var(--space-4);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
   border-radius: var(--radius);
+}
+
+.line:has([aria-invalid="true"]) {
+  border-left-color: var(--error);
 }
 
 .product h3 {
@@ -151,30 +156,45 @@
   gap: var(--space-3);
 }
 
+/* Price or margin: one segmented control, so the choice reads as two sides of one setting. */
+.mode > div {
+  gap: 0 !important;
+  border: 2px solid var(--input-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
 .mode :global(.react-aria-Radio) {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-height: 32px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
   cursor: pointer;
 }
 
-.mode :global(.react-aria-Radio)::before {
-  content: "";
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--input-border);
-  border-radius: 50%;
-  background: var(--bg);
+.mode :global(.react-aria-Radio) + :global(.react-aria-Radio) {
+  border-left: 2px solid var(--input-border);
 }
 
-.mode :global(.react-aria-Radio[data-selected])::before {
-  border: 5px solid var(--primary);
+.mode :global(.react-aria-Radio[data-selected]) {
+  background: var(--primary);
+  color: var(--on-primary);
 }
 
-.mode :global(.react-aria-Radio[data-focus-visible])::before {
+.mode :global(.react-aria-Radio[data-focus-visible]) {
   outline: 3px solid var(--focus);
-  outline-offset: 2px;
+  outline-offset: -3px;
+}
+
+/* In a contrast theme the fill disappears, so the chosen side keeps a heavy underline. */
+@media (forced-colors: active) {
+  .mode :global(.react-aria-Radio[data-selected]) {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+  }
 }
 
 .inputWrap {
@@ -222,6 +242,7 @@
 
 .earn {
   font-weight: 700;
+  color: var(--success);
 }
 
 .fieldError {
@@ -277,6 +298,10 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
+}
+
+.totals div:nth-child(2) dd {
+  color: var(--success);
 }
 
 .sendBar {

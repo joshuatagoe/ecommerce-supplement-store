@@ -232,3 +232,15 @@ test("the pay page fits a 320px-wide screen", async ({ browser }) => {
   await expect(page.getByRole("button", { name: "Pay $36.00" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
+
+test("in a contrast theme the controls keep real borders, and axe is clean (§9)", async ({ browser }) => {
+  const { path } = await sentLink(browser);
+  const page = await patientPage(browser, path);
+  await page.emulateMedia({ forcedColors: "active" });
+  const border = (text: RegExp) => page.getByText(text).first().evaluate((el) => getComputedStyle(el).borderTopStyle);
+  expect(await page.getByRole("button", { name: /^Pay/ }).evaluate((el) => getComputedStyle(el).borderTopStyle)).not.toBe("none");
+  // The saving is a pill with its own border, so it doesn't rely on a background tint.
+  expect(await border(/^You save \$4\.00$/)).not.toBe("none");
+  expect(await page.getByLabel("Card number").evaluate((el) => getComputedStyle(el).borderTopStyle)).not.toBe("none");
+  await expectNoAxeViolations(page);
+});

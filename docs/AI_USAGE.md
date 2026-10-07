@@ -210,3 +210,10 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 43. **The AI first put the helper that signs pay links in a `"use server"` file.** Every export of such a file can be called from the browser, so anyone signed in could have asked it to sign a link for any ref. Caught while writing the Sales page, before it ever ran; the helper now lives in a plain server module.
 44. **The AI's browser tests asked for the "New order" link and found two.** Playwright matches names by substring, and the empty Sales page's "Start a new order" link matched too. The tests now ask for the exact name. One test also counted My store's Remove buttons before the page had loaded, so it removed nothing; it now waits for the page.
+
+## 2026-10-07 — M6 (seed history and polish)
+
+### What worked
+
+- **Seeding history through the app's own code, with a fixed random seed.** The seed's 33 paid orders pass reconciliation, Dr. Patel's lines all earn exactly $0.00, and rebuilding gives the same history every time. A test checks each of those.
+- **Checking the polish under a contrast theme.** Screenshots with forced colours on showed the pay page's tints disappearing as expected, with every pill, mark and control keeping its border. Two browser tests now emulate a contrast theme and run axe.

@@ -3,6 +3,26 @@
 // Rivera's list as they run, so these tests find their own orders by ref.
 import AxeBuilder from "@axe-core/playwright";
 import { type Browser, expect, type Page, test } from "@playwright/test";
+import pg from "pg";
+
+for (const file of [".env", ".env.example"]) {
+  try {
+    process.loadEnvFile(file);
+    break;
+  } catch {
+    // Try the next file.
+  }
+}
+
+async function sql(text: string, values: unknown[] = []) {
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    return (await client.query(text, values)).rows;
+  } finally {
+    await client.end();
+  }
+}
 
 async function signIn(page: Page, name = "Dr. Rivera") {
   await page.goto("/sign-in");
@@ -47,11 +67,18 @@ function row(page: Page, ref: string) {
 }
 
 test("signing in opens Sales, and a provider with no orders sees where to start", async ({ page }) => {
-  await signIn(page, "Dr. Patel");
+  // The seed gives both demo providers months of orders (M6), so this test adds one with none.
+  const [practice] = await sql("SELECT practice_id FROM providers WHERE display_name = 'Dr. Patel'");
+  const [newcomer] = await sql("INSERT INTO providers (practice_id, display_name) VALUES ($1, 'Dr. Newcomer') RETURNING id", [
+    practice.practice_id,
+  ]);
+  await signIn(page, "Dr. Newcomer");
   await expect(page.getByRole("heading", { name: "Sales", level: 1 })).toBeVisible();
   await expect(page.getByText("No orders yet.")).toBeVisible();
   await page.getByRole("main").getByRole("link", { name: "Start a new order" }).click();
+  // Dr. Newcomer's store is empty, so New order points to My store first (F1).
   await expect(page.getByRole("heading", { name: "New order", level: 1 })).toBeVisible();
+  await sql("DELETE FROM providers WHERE id = $1", [newcomer.id]);
 });
 
 test("a paid order shows in Sales with its status, totals and Order again, and in this month's totals", async ({ page, browser }) => {

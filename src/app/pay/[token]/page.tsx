@@ -69,6 +69,11 @@ export default async function PayPage({ params, searchParams }: Props) {
 
         {view.state === "paid" && (
           <>
+            <span className={`${styles.mark} ${styles.paidMark}`} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+            </span>
             <h1>{notice === "paid" ? "Thank you. Your payment went through." : "Already paid"}</h1>
             <p className={styles.lede}>
               {notice === "paid" ? "Here's your receipt." : "This order is paid. Here's your receipt."}

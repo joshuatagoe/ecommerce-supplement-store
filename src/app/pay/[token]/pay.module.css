@@ -17,6 +17,8 @@
   max-width: 560px;
   margin: 0 auto;
   font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
 }
 
 .main {
@@ -48,11 +50,18 @@
 
 .item {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
-  gap: var(--space-3);
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: var(--space-4);
   align-items: start;
   padding: var(--space-4) 0;
   border-bottom: 1px solid var(--border);
+}
+
+.item img {
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  background: var(--surface);
 }
 
 .itemName p {
@@ -76,9 +85,16 @@
 }
 
 .save {
+  display: inline-block;
+  margin-top: var(--space-1) !important;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--success);
+  border-radius: 999px;
+  background: var(--success-tint);
   color: var(--success);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .total {
@@ -89,10 +105,27 @@
   font-size: 1.25rem;
 }
 
+.total strong {
+  font-size: 1.6rem;
+}
+
 .form {
   margin-top: var(--space-6);
-  padding-top: var(--space-5);
-  border-top: 2px solid var(--text);
+  padding: var(--space-5) var(--space-4);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.pair {
+  display: grid;
+  gap: 0 var(--space-3);
+}
+
+@media (min-width: 360px) {
+  .pair {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .form h2 {
@@ -250,5 +283,48 @@
 
   .cardNumber {
     white-space: normal;
+  }
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-3);
+  border: 3px solid currentColor;
+  border-radius: 50%;
+}
+
+.mark svg {
+  width: 28px;
+  height: 28px;
+}
+
+.paidMark {
+  color: var(--success);
+  background: var(--success-tint);
+}
+
+.waitMark {
+  color: var(--info);
+  background: var(--info-tint);
+}
+
+/* The one moving thing: a slow pulse while a payment is confirmed. */
+@media (prefers-reduced-motion: no-preference) {
+  .waitMark {
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(46 98 118 / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgb(46 98 118 / 0);
   }
 }

@@ -238,3 +238,14 @@ test.describe("with an empty store", () => {
     await expect(page).toHaveURL(/\/store$/);
   });
 });
+
+test("in a contrast theme the draft's controls stay visible, and axe is clean (§9)", async ({ page }) => {
+  const magnesium = await draftWithMagnesium(page);
+  await page.emulateMedia({ forcedColors: "active" });
+  // The chosen side of Price or Margin is underlined when the fill colour is gone.
+  expect(await magnesium.getByText("Price", { exact: true }).evaluate((el) => getComputedStyle(el).textDecorationLine)).toContain(
+    "underline",
+  );
+  expect(await page.getByRole("button", { name: "Send" }).evaluate((el) => getComputedStyle(el).borderTopStyle)).not.toBe("none");
+  await expectNoAxeViolations(page);
+});

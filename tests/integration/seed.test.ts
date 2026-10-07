@@ -8,6 +8,9 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "@/server/db/schema";
+import { reconcile } from "@/server/reporting/reconcile";
 import { checkPrice, lowestPriceCents } from "@/shared/pricing";
 import { runMigrations } from "../../scripts/migrate";
 
@@ -119,6 +122,55 @@ describe("npm run seed", () => {
     expect(await rows("SELECT id FROM providers ORDER BY id")).toEqual(before);
   }, 30_000);
 
+  it("builds about four months of orders for both providers (M6)", async () => {
+    const [span] = await rows(
+      "SELECT extract(day FROM now() - min(created_at))::int AS days, count(*)::int AS orders FROM orders",
+    );
+    expect(Number(span.days)).toBeGreaterThanOrEqual(100);
+    expect(Number(span.days)).toBeLessThanOrEqual(130);
+    const paid = await rows(
+      "SELECT pr.display_name, count(*)::int AS n FROM orders o JOIN providers pr ON pr.id = o.provider_id WHERE o.status = 'paid' GROUP BY 1",
+    );
+    expect(paid).toHaveLength(2);
+    for (const provider of paid) expect(Number(provider.n), String(provider.display_name)).toBeGreaterThanOrEqual(10);
+  });
+
+  it("shows every status that lasts, for each provider, and none still being confirmed", async () => {
+    const statuses = await rows(
+      `SELECT pr.display_name,
+              CASE WHEN o.status = 'sent' AND o.link_expires_at <= now() THEN 'expired' ELSE o.status END AS shown
+         FROM orders o JOIN providers pr ON pr.id = o.provider_id GROUP BY 1, 2`,
+    );
+    for (const name of ["Dr. Rivera", "Dr. Patel"]) {
+      const shown = statuses.filter((s) => s.display_name === name).map((s) => s.shown);
+      expect(shown.sort(), name).toEqual(["cancelled", "draft", "expired", "paid", "sent"]);
+    }
+    // "Needs review" lasts seconds: the sweep settles it, so the seed leaves nothing pending.
+    expect(await rows("SELECT id FROM payment_attempts WHERE status = 'pending'")).toEqual([]);
+  });
+
+  it("makes its history through the real money code: every paid order adds up", async () => {
+    const db = drizzle(new pg.Pool({ connectionString: url.href, max: 1 }), { schema });
+    try {
+      expect(await reconcile({ db, now: () => new Date(), sweepAfterMs: 15_000 })).toEqual([]);
+    } finally {
+      await db.$client.end();
+    }
+    // Dr. Patel sells at no profit (D3), so every one of Dr. Patel's lines earns $0.00.
+    expect(
+      await rows(
+        `SELECT DISTINCT l.unit_margin_cents FROM order_lines l JOIN orders o ON o.id = l.order_id
+           JOIN providers pr ON pr.id = o.provider_id WHERE pr.display_name = 'Dr. Patel' AND l.frozen_at IS NOT NULL`,
+      ),
+    ).toEqual([{ unit_margin_cents: 0 }]);
+    expect(await rows("SELECT id FROM orders WHERE NOT (created_at <= coalesce(sent_at, created_at) AND coalesce(sent_at, created_at) <= coalesce(paid_at, now()))")).toEqual([]);
+  });
+
+  it("includes repeat orders made with Order again", async () => {
+    const [repeats] = await rows("SELECT count(*)::int AS n FROM orders WHERE source_order_id IS NOT NULL");
+    expect(Number(repeats.n)).toBeGreaterThanOrEqual(2);
+  });
+
   it("rebuilds everything with --reset", async () => {
     const before = await rows("SELECT id FROM providers ORDER BY id");
     await db.query("DELETE FROM store_items");
@@ -128,5 +180,12 @@ describe("npm run seed", () => {
     expect(after).not.toEqual(before);
     expect((await rows("SELECT count(*)::int AS n FROM store_items"))[0].n).toBeGreaterThan(0);
     expect((await rows("SELECT count(*)::int AS n FROM catalog_items"))[0].n).toBe(8);
-  }, 30_000);
+  }, 60_000);
+
+  it("builds the same history every time", async () => {
+    const shape = () => rows("SELECT status, count(*)::int AS n FROM orders GROUP BY status ORDER BY status");
+    const before = await shape();
+    seed("--reset");
+    expect(await shape()).toEqual(before);
+  }, 60_000);
 });
