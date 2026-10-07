@@ -1,0 +1,89 @@
+.skip {
+  position: absolute;
+  left: var(--space-4);
+  top: -100px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg);
+  border: 2px solid var(--primary);
+  z-index: 10;
+}
+
+.skip:focus {
+  top: var(--space-2);
+}
+
+.header {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.bar {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+}
+
+.brand {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  font-weight: 600;
+}
+
+.nav a[aria-current="page"] {
+  color: var(--text);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 6px;
+}
+
+.who {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.who p {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  line-height: 1.25;
+}
+
+.provider {
+  font-weight: 700;
+}
+
+.practice {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.main {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.main:focus {
+  outline: none;
+}

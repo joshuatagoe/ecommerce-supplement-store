@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D52). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D54). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -508,7 +508,7 @@ Every write below happens in **one transaction**. "Access" means the provider's 
 
 | Action | Browser sends | Server path | Writes | Returns |
 |---|---|---|---|---|
-| Sign in (fake) | provider | Access | — (sets the cookie) | Redirect to Sales |
+| Sign in (fake) | provider | Access | — (sets the cookie) | Redirect to Sales (My store until Sales lands in M5) |
 | Set a usual price | item, price | Access → Store → Pricing | `store_items` | The saved price, "You earn", the saving |
 | Start an order / Order again | patient, or the past order's ref | Access → Orders | `orders` (draft), `order_lines` (copied), event | Order ref |
 | Edit a draft (autosave) | lines: item, quantity, price or margin | Access → Orders → Pricing | `order_lines`, event "price changed" | Each line's split, with out-of-range lines flagged |
@@ -622,7 +622,7 @@ flowchart TB
 | `--info` / tint | #2e6276 / #e7f6f8 | 6.0:1 |
 | Demo banner | #1b1b1b on #ffbe2e | 10.4:1 |
 
-**Fonts** (both under the SIL Open Font License, hosted by us):
+**Fonts** (both under the SIL Open Font License, hosted by us: `next/font` downloads them at build time and serves them from our own origin):
 - **Portal:** **Source Sans 3**, 16px. Its digits are all the same width, so prices line up in columns.
 - **Patient page:** **Atkinson Hyperlegible Next**, 19px body text with a line height of 1.5. It was designed for low-vision readers.
 
@@ -736,7 +736,7 @@ The alternatives each lack something:
 | **Golden cases** (`tests/golden/money.cases.ts`) | Money examples with exact answers: $20.00 → $20.16 lowest price, $38.00 → 29¢ fee, 2 × $36.10 → 56¢ fee and $31.64 earned, $36.00 → 27¢ and $15.73. **Frozen once approved.** Changing an expected value means changing a money rule, which needs the user's OK. |
 | **Property tests** (fast-check) | For thousands of random prices and costs: the parts always add up, the margin is never negative at or above the lowest price, the fee always rounds up, and entering a margin lands exactly on it, at the lowest such price |
 | **Integration tests** (real Postgres) | Each database rule refuses bad data. Every row of the Pay "breaks" table behaves as designed. The race test charges exactly once. The sweep settles each test-card outcome. Cancel and Pay at the same moment never leave a paid cancelled order. |
-| **End-to-end** (Playwright) | The provider builds and sends an order, then the patient pays. axe runs on every page and every pay-page state. A **keyboard-only** run completes the flow. Accessibility-tree snapshots cover the pay-page states. Runs are emulated under a contrast theme and at 320px wide. |
+| **End-to-end** (Playwright) | Each run starts by rebuilding the seed (`seed --reset` on the local app database). The provider builds and sends an order, then the patient pays. axe runs on every page and every pay-page state. A **keyboard-only** run completes the flow. Accessibility-tree snapshots cover the pay-page states. Runs are emulated under a contrast theme and at 320px wide. |
 | **Manual** | One NVDA screen-reader pass on the pay flow, recorded in the report |
 | **Load and drill** | [§2](#load-tests) |
 
@@ -780,7 +780,7 @@ CI runs only on GitHub, and the README links to its runs so graders reading GitL
 | `SSE_HEARTBEAT_MS` / `SSE_MAX_MS` | 15,000 / 300,000 | Same | — |
 | `AUTOSAVE_DEBOUNCE_MS` | 1,000 | Same | — |
 | `PAYMENTS_MODE` | `stub` | `stripe` | Test cards exist only in `stub` |
-| Secrets | `DATABASE_URL` (direct connection), `JWT_SECRET`, `LINK_SIGNING_KEY`, `STUB_STORE_PATH` | Same, minus the stub | Never committed |
+| Secrets | `DATABASE_URL` (direct connection), `JWT_SECRET` (at least 32 characters), `LINK_SIGNING_KEY`, `STUB_STORE_PATH` | Same, minus the stub | Never committed |
 
 ## 15. Repository layout
 
@@ -791,7 +791,7 @@ src/
     pay/[token]/        page.tsx (six states), events/route.ts (SSE)
     api/health/         route.ts
   server/               business modules; never import Next.js
-    access/ store/ orders/ payments/ reporting/ links/ health.ts
+    access/ store/ orders/ payments/ reporting/ links/ seed/ config.ts health.ts release.ts
     ports/              payment-gateway.ts, link-sender.ts, patient-directory.ts
     adapters/           stub-payments/ (own file store), log-link-sender.ts, seeded-patients.ts
     db/                 schema.ts, client.ts, notify.ts (LISTEN/NOTIFY)

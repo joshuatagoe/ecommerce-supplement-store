@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<rect width="160" height="160" rx="12" fill="#f1f3f6"/>
+<rect x="56" y="14" width="48" height="18" rx="4" fill="#216e1f"/>
+<rect x="60" y="30" width="40" height="8" fill="#dfe1e2"/>
+<rect x="40" y="36" width="80" height="112" rx="14" fill="#ffffff" stroke="#565c65" stroke-width="2"/>
+<rect x="40" y="56" width="80" height="72" fill="#216e1f" opacity="0.14"/>
+<rect x="40" y="56" width="80" height="8" fill="#216e1f"/>
+<text x="80" y="76" text-anchor="middle" font-size="8" letter-spacing="0.5" fill="#565c65">NORDIC NATURALS</text>
+<text x="80" y="82" text-anchor="middle" font-size="12" font-weight="700" fill="#1b1b1b">Nordic Flora</text><text x="80" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#1b1b1b">Probiotic</text><text x="80" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#1b1b1b">Daily</text>
+<text x="80" y="140" text-anchor="middle" font-size="8" fill="#565c65">60 capsules</text>
+</svg>

@@ -1,0 +1,240 @@
+.intro {
+  color: var(--text-muted);
+  margin: var(--space-2) 0 var(--space-4);
+  max-width: 70ch;
+}
+
+.section {
+  margin-top: var(--space-6);
+}
+
+.section h2 {
+  margin-bottom: var(--space-3);
+}
+
+.section h2:focus {
+  outline: none;
+}
+
+.section h2:focus-visible {
+  outline: 3px solid var(--focus);
+}
+
+.empty {
+  padding: var(--space-4);
+  border: 1px dashed var(--input-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) minmax(220px, 260px) auto;
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.details p {
+  margin: 0;
+}
+
+.brand {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.name {
+  font-size: 1.125rem;
+}
+
+.size {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.bounds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-2) !important;
+  font-size: 0.9375rem;
+}
+
+.price label {
+  display: block;
+  font-weight: 600;
+}
+
+.inputWrap {
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-1);
+  border: 2px solid var(--input-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.inputWrap:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.inputWrap span {
+  padding-left: var(--space-3);
+  color: var(--text-muted);
+}
+
+.inputWrap input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--target);
+  padding: 0 var(--space-3) 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  text-align: right;
+}
+
+.inputWrap input:focus-visible {
+  outline: none;
+}
+
+.inputWrap:has(input[aria-invalid="true"]) {
+  border-color: var(--error);
+}
+
+.hint {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-2) 0 0;
+  font-size: 0.9375rem;
+}
+
+.hint span:first-child {
+  font-weight: 600;
+}
+
+.fieldError {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-2);
+  border-left: 4px solid var(--error);
+  color: var(--error);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  max-width: 220px;
+}
+
+.status {
+  flex-basis: 100%;
+  margin: 0;
+  min-height: 1.5em;
+  text-align: right;
+  font-weight: 600;
+}
+
+.status[data-tone="success"] {
+  color: var(--success);
+}
+
+.status[data-tone="error"] {
+  color: var(--error);
+}
+
+.error {
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--error);
+  border-radius: var(--radius);
+  background: var(--error-tint);
+  color: var(--error);
+  font-weight: 600;
+}
+
+.tableWrap {
+  /* The containing block for visually hidden text inside the table, which
+     would otherwise widen the page past the scrolling region. */
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table thead th {
+  background: var(--surface);
+  font-size: 0.875rem;
+}
+
+.table tbody th {
+  font-weight: 400;
+}
+
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.product {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 220px;
+}
+
+.added {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .item {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .price,
+  .actions {
+    grid-column: 1 / -1;
+  }
+
+  .actions {
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .status {
+    text-align: left;
+  }
+}

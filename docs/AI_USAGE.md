@@ -161,3 +161,16 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 34. **The AI guessed that a Workflow permission prompt had stalled arm 3's first run.** Two test sessions showed that Workflows run without asking. The real cause, a session that made no further request after loading a guide, didn't happen again. The driver now restarts a quiet session up to twice and leaves the hung time out of the arm's time.
 35. **A referee test timed out once while scoring arm 2.** That cost it two stated tests, and a rerun passed them. The scorer now reruns once when the only failures are infrastructure errors (a timeout, or the aborted transaction that follows one). A real bug fails again.
 36. **The AI first resumed a stalled session with its launch flags, which starts a copy under a new ID.** A test caught it. Resuming with no flags wakes the same session, with its saved model, effort and permissions.
+
+## 2026-10-07 — S1 contracts and M2 (sign in, My store)
+
+### What worked
+
+- **One grill for every remaining milestone, answered in one message.** The questions only the user could answer (the health fields, Add's starting price, test cards, seeding the live database, metrics, pace) were settled before any card was seeded. Routine choices went in as named assumptions.
+- **A research subagent for the demo catalog.** It read each brand's own US product page and reported where it couldn't confirm a price, rather than estimating. Four brands' prices were confirmed. Four others were left out, because their sites block automated access or need a practitioner login.
+- **Screenshots at phone width, not just tests.** The browser tests and axe passed, and a screenshot at 320px still found the page scrolling sideways (item 37).
+
+### Where AI misled us or we course-corrected
+
+37. **The AI's first My store page was 543px wide on a 320px phone.** A visually hidden column header inside the scrolling catalog table was positioned against the page instead of the table, so it pushed the page past the scroll region. All 13 browser tests and axe passed. A screenshot and a width measurement caught it; the table wrapper is now the hidden text's containing block, and a new test checks the width at 320px.
+38. **The AI's first "Not saved" message showed in success green.** Caught on the same screenshots; the status now takes its colour from the outcome.

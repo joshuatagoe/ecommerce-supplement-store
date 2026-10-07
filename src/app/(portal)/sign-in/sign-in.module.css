@@ -1,0 +1,49 @@
+.page {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.intro {
+  color: var(--text-muted);
+  margin: var(--space-3) 0 var(--space-5);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.practice {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.error {
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--error);
+  border-radius: var(--radius);
+  background: var(--error-tint);
+  color: var(--error);
+  font-weight: 600;
+}

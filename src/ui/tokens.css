@@ -1,0 +1,153 @@
+/* Design tokens (ARCHITECTURE.md §9, D35): palette A from the US Web Design
+   System. Every colour is a token, so contrast themes and a later dark mode
+   only swap values. Light only in the slice. */
+:root {
+  color-scheme: light;
+  --text: #1b1b1b;
+  --text-muted: #565c65;
+  --bg: #ffffff;
+  --surface: #f1f3f6;
+  --primary: #005ea2;
+  --primary-hover: #1a4480;
+  --on-primary: #ffffff;
+  --border: #dfe1e2;
+  --input-border: #565c65;
+  --focus: #0076d6;
+  --success: #216e1f;
+  --success-tint: #ecf3ec;
+  --warning: #7a591a;
+  --warning-tint: #faf3d1;
+  --error: #b50909;
+  --error-tint: #f4e3db;
+  --info: #2e6276;
+  --info-tint: #e7f6f8;
+  --banner-bg: #ffbe2e;
+  --banner-text: #1b1b1b;
+
+  --font-portal: var(--font-source-sans), "Source Sans 3", system-ui, sans-serif;
+  --font-patient: var(--font-atkinson), "Atkinson Hyperlegible Next", system-ui, sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --radius: 4px;
+  --target: 44px;
+  --page-width: 1040px;
+}
+
+/* Increased contrast: secondary text becomes body text, and light borders darken. */
+@media (prefers-contrast: more) {
+  :root {
+    --text-muted: var(--text);
+    --border: var(--input-border);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-portal);
+  font-size: 16px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0;
+}
+
+/* Focus uses outline, which survives forced colours (§9). */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+a {
+  color: var(--primary);
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Buttons keep a real border, so they stay visible in a contrast theme. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--target);
+  padding: 0 var(--space-4);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.button:hover {
+  border-color: var(--primary-hover);
+  color: var(--primary-hover);
+}
+
+.button-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.button-primary:hover {
+  background: var(--primary-hover);
+  color: var(--on-primary);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
