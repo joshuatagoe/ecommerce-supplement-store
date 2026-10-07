@@ -1,0 +1,1078 @@
+{
+  "id": "6aa4eda4-a675-4a1f-8bfd-c9290dbea539",
+  "prevId": "e409f5d2-983c-4b39-8b99-b1598091736e",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.catalog_items": {
+      "name": "catalog_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "brand": {
+          "name": "brand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_label": {
+          "name": "size_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image_path": {
+          "name": "image_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image_alt": {
+          "name": "image_alt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cost_cents": {
+          "name": "cost_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "msrp_cents": {
+          "name": "msrp_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalog_items_cost_cents_not_negative": {
+          "name": "catalog_items_cost_cents_not_negative",
+          "value": "\"catalog_items\".\"cost_cents\" >= 0"
+        },
+        "catalog_items_msrp_cents_not_negative": {
+          "name": "catalog_items_msrp_cents_not_negative",
+          "value": "\"catalog_items\".\"msrp_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.order_events": {
+      "name": "order_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_type": {
+          "name": "actor_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "details": {
+          "name": "details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "order_events_order_at_idx": {
+          "name": "order_events_order_at_idx",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "order_events_order_id_orders_id_fk": {
+          "name": "order_events_order_id_orders_id_fk",
+          "tableFrom": "order_events",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "order_events_actor_type_known": {
+          "name": "order_events_actor_type_known",
+          "value": "\"order_events\".\"actor_type\" IN ('provider', 'patient', 'sweep', 'system')"
+        },
+        "order_events_system_has_no_actor": {
+          "name": "order_events_system_has_no_actor",
+          "value": "NOT (\"order_events\".\"actor_type\" IN ('sweep', 'system')) OR (\"order_events\".\"actor_id\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.order_lines": {
+      "name": "order_lines",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "catalog_item_id": {
+          "name": "catalog_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_price_cents": {
+          "name": "unit_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frozen_at": {
+          "name": "frozen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_cost_cents": {
+          "name": "unit_cost_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fee_rate_bps": {
+          "name": "fee_rate_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_fee_cents": {
+          "name": "unit_fee_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_margin_cents": {
+          "name": "unit_margin_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_msrp_cents": {
+          "name": "unit_msrp_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_name": {
+          "name": "product_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_path": {
+          "name": "image_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_alt": {
+          "name": "image_alt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "order_lines_order_id_orders_id_fk": {
+          "name": "order_lines_order_id_orders_id_fk",
+          "tableFrom": "order_lines",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "order_lines_catalog_item_id_catalog_items_id_fk": {
+          "name": "order_lines_catalog_item_id_catalog_items_id_fk",
+          "tableFrom": "order_lines",
+          "tableTo": "catalog_items",
+          "columnsFrom": [
+            "catalog_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "order_lines_one_per_product": {
+          "name": "order_lines_one_per_product",
+          "nullsNotDistinct": false,
+          "columns": [
+            "order_id",
+            "catalog_item_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "order_lines_quantity_range": {
+          "name": "order_lines_quantity_range",
+          "value": "\"order_lines\".\"quantity\" BETWEEN 1 AND 10"
+        },
+        "order_lines_unit_price_cents_not_negative": {
+          "name": "order_lines_unit_price_cents_not_negative",
+          "value": "\"order_lines\".\"unit_price_cents\" >= 0"
+        },
+        "order_lines_unit_cost_cents_not_negative": {
+          "name": "order_lines_unit_cost_cents_not_negative",
+          "value": "\"order_lines\".\"unit_cost_cents\" >= 0"
+        },
+        "order_lines_unit_fee_cents_not_negative": {
+          "name": "order_lines_unit_fee_cents_not_negative",
+          "value": "\"order_lines\".\"unit_fee_cents\" >= 0"
+        },
+        "order_lines_unit_margin_cents_not_negative": {
+          "name": "order_lines_unit_margin_cents_not_negative",
+          "value": "\"order_lines\".\"unit_margin_cents\" >= 0"
+        },
+        "order_lines_unit_msrp_cents_not_negative": {
+          "name": "order_lines_unit_msrp_cents_not_negative",
+          "value": "\"order_lines\".\"unit_msrp_cents\" >= 0"
+        },
+        "order_lines_fee_rate_bps_range": {
+          "name": "order_lines_fee_rate_bps_range",
+          "value": "\"order_lines\".\"fee_rate_bps\" BETWEEN 0 AND 10000"
+        },
+        "order_lines_frozen_complete": {
+          "name": "order_lines_frozen_complete",
+          "value": "NOT (\"order_lines\".\"frozen_at\" IS NOT NULL) OR (num_nulls(\"order_lines\".\"unit_cost_cents\", \"order_lines\".\"fee_rate_bps\", \"order_lines\".\"unit_fee_cents\", \"order_lines\".\"unit_margin_cents\", \"order_lines\".\"unit_msrp_cents\", \"order_lines\".\"product_name\", \"order_lines\".\"image_path\", \"order_lines\".\"image_alt\") = 0)"
+        },
+        "order_lines_frozen_adds_up": {
+          "name": "order_lines_frozen_adds_up",
+          "value": "NOT (\"order_lines\".\"frozen_at\" IS NOT NULL) OR (\"order_lines\".\"unit_cost_cents\" + \"order_lines\".\"unit_fee_cents\" + \"order_lines\".\"unit_margin_cents\" = \"order_lines\".\"unit_price_cents\")"
+        },
+        "order_lines_frozen_fee_right": {
+          "name": "order_lines_frozen_fee_right",
+          "value": "NOT (\"order_lines\".\"frozen_at\" IS NOT NULL) OR (\"order_lines\".\"unit_fee_cents\" = (\"order_lines\".\"unit_price_cents\"::bigint * \"order_lines\".\"fee_rate_bps\" + 9999) / 10000)"
+        },
+        "order_lines_frozen_in_range": {
+          "name": "order_lines_frozen_in_range",
+          "value": "NOT (\"order_lines\".\"frozen_at\" IS NOT NULL) OR (\"order_lines\".\"unit_margin_cents\" >= 0 AND \"order_lines\".\"unit_price_cents\" <= \"order_lines\".\"unit_msrp_cents\")"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.orders": {
+      "name": "orders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "ref": {
+          "name": "ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "patient_id": {
+          "name": "patient_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_order_id": {
+          "name": "source_order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "link_version": {
+          "name": "link_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_expires_at": {
+          "name": "link_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fee_rate_bps": {
+          "name": "fee_rate_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_cents": {
+          "name": "total_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_cents": {
+          "name": "cost_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fee_cents": {
+          "name": "fee_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "margin_cents": {
+          "name": "margin_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_attempt_id": {
+          "name": "paid_attempt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "orders_provider_created_idx": {
+          "name": "orders_provider_created_idx",
+          "columns": [
+            {
+              "expression": "provider_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "first"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "orders_provider_sent_idx": {
+          "name": "orders_provider_sent_idx",
+          "columns": [
+            {
+              "expression": "provider_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sent_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "first"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "orders_provider_paid_idx": {
+          "name": "orders_provider_paid_idx",
+          "columns": [
+            {
+              "expression": "provider_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "paid_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "first"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "orders_provider_id_providers_id_fk": {
+          "name": "orders_provider_id_providers_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "providers",
+          "columnsFrom": [
+            "provider_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "orders_practice_id_practices_id_fk": {
+          "name": "orders_practice_id_practices_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "orders_patient_id_patients_id_fk": {
+          "name": "orders_patient_id_patients_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "patients",
+          "columnsFrom": [
+            "patient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "orders_source_order_id_orders_id_fk": {
+          "name": "orders_source_order_id_orders_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "source_order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "orders_paid_attempt_fk": {
+          "name": "orders_paid_attempt_fk",
+          "tableFrom": "orders",
+          "tableTo": "payment_attempts",
+          "columnsFrom": [
+            "id",
+            "paid_attempt_id"
+          ],
+          "columnsTo": [
+            "order_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "orders_ref_unique": {
+          "name": "orders_ref_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "ref"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "orders_status_known": {
+          "name": "orders_status_known",
+          "value": "\"orders\".\"status\" IN ('draft', 'sent', 'needs_review', 'paid', 'cancelled')"
+        },
+        "orders_total_cents_not_negative": {
+          "name": "orders_total_cents_not_negative",
+          "value": "\"orders\".\"total_cents\" >= 0"
+        },
+        "orders_cost_cents_not_negative": {
+          "name": "orders_cost_cents_not_negative",
+          "value": "\"orders\".\"cost_cents\" >= 0"
+        },
+        "orders_fee_cents_not_negative": {
+          "name": "orders_fee_cents_not_negative",
+          "value": "\"orders\".\"fee_cents\" >= 0"
+        },
+        "orders_margin_cents_not_negative": {
+          "name": "orders_margin_cents_not_negative",
+          "value": "\"orders\".\"margin_cents\" >= 0"
+        },
+        "orders_fee_rate_bps_range": {
+          "name": "orders_fee_rate_bps_range",
+          "value": "\"orders\".\"fee_rate_bps\" BETWEEN 0 AND 10000"
+        },
+        "orders_link_version_positive": {
+          "name": "orders_link_version_positive",
+          "value": "\"orders\".\"link_version\" >= 1"
+        },
+        "orders_totals_add_up": {
+          "name": "orders_totals_add_up",
+          "value": "\"orders\".\"cost_cents\" + \"orders\".\"fee_cents\" + \"orders\".\"margin_cents\" = \"orders\".\"total_cents\""
+        },
+        "orders_sent_has_sent_at": {
+          "name": "orders_sent_has_sent_at",
+          "value": "NOT (\"orders\".\"status\" IN ('sent', 'needs_review', 'paid')) OR (\"orders\".\"sent_at\" IS NOT NULL)"
+        },
+        "orders_draft_not_sent": {
+          "name": "orders_draft_not_sent",
+          "value": "NOT (\"orders\".\"status\" = 'draft') OR (\"orders\".\"sent_at\" IS NULL)"
+        },
+        "orders_send_fields_set": {
+          "name": "orders_send_fields_set",
+          "value": "NOT (\"orders\".\"sent_at\" IS NOT NULL) OR (num_nulls(\"orders\".\"fee_rate_bps\", \"orders\".\"link_version\", \"orders\".\"link_expires_at\", \"orders\".\"total_cents\", \"orders\".\"cost_cents\", \"orders\".\"fee_cents\", \"orders\".\"margin_cents\") = 0)"
+        },
+        "orders_cancelled_has_cancelled_at": {
+          "name": "orders_cancelled_has_cancelled_at",
+          "value": "(\"orders\".\"status\" = 'cancelled') = (\"orders\".\"cancelled_at\" IS NOT NULL)"
+        },
+        "orders_paid_has_payment": {
+          "name": "orders_paid_has_payment",
+          "value": "(\"orders\".\"status\" = 'paid') = (\"orders\".\"paid_attempt_id\" IS NOT NULL) AND (\"orders\".\"status\" = 'paid') = (\"orders\".\"paid_at\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.patients": {
+      "name": "patients",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_name": {
+          "name": "last_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "patients_practice_id_practices_id_fk": {
+          "name": "patients_practice_id_practices_id_fk",
+          "tableFrom": "patients",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.payment_attempts": {
+      "name": "payment_attempts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "charge_ref": {
+          "name": "charge_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "settled_by": {
+          "name": "settled_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "settled_at": {
+          "name": "settled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "payment_attempts_pay_key_once": {
+          "name": "payment_attempts_pay_key_once",
+          "columns": [
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "one_live_attempt_per_order": {
+          "name": "one_live_attempt_per_order",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"payment_attempts\".\"status\" IN ('pending', 'succeeded')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payment_attempts_pending_created_idx": {
+          "name": "payment_attempts_pending_created_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"payment_attempts\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payment_attempts_order_id_orders_id_fk": {
+          "name": "payment_attempts_order_id_orders_id_fk",
+          "tableFrom": "payment_attempts",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "payment_attempts_order_id_id_unique": {
+          "name": "payment_attempts_order_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "order_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "payment_attempts_amount_cents_not_negative": {
+          "name": "payment_attempts_amount_cents_not_negative",
+          "value": "\"payment_attempts\".\"amount_cents\" >= 0"
+        },
+        "payment_attempts_status_known": {
+          "name": "payment_attempts_status_known",
+          "value": "\"payment_attempts\".\"status\" IN ('pending', 'succeeded', 'declined', 'failed')"
+        },
+        "payment_attempts_settled_by_known": {
+          "name": "payment_attempts_settled_by_known",
+          "value": "\"payment_attempts\".\"settled_by\" IN ('request', 'sweep')"
+        },
+        "payment_attempts_success_has_charge_ref": {
+          "name": "payment_attempts_success_has_charge_ref",
+          "value": "NOT (\"payment_attempts\".\"status\" = 'succeeded') OR (\"payment_attempts\".\"charge_ref\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.practices": {
+      "name": "practices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.providers": {
+      "name": "providers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "providers_practice_id_practices_id_fk": {
+          "name": "providers_practice_id_practices_id_fk",
+          "tableFrom": "providers",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.store_items": {
+      "name": "store_items",
+      "schema": "",
+      "columns": {
+        "provider_id": {
+          "name": "provider_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "catalog_item_id": {
+          "name": "catalog_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usual_price_cents": {
+          "name": "usual_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "store_items_provider_id_providers_id_fk": {
+          "name": "store_items_provider_id_providers_id_fk",
+          "tableFrom": "store_items",
+          "tableTo": "providers",
+          "columnsFrom": [
+            "provider_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "store_items_catalog_item_id_catalog_items_id_fk": {
+          "name": "store_items_catalog_item_id_catalog_items_id_fk",
+          "tableFrom": "store_items",
+          "tableTo": "catalog_items",
+          "columnsFrom": [
+            "catalog_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "store_items_pkey": {
+          "name": "store_items_pkey",
+          "columns": [
+            "provider_id",
+            "catalog_item_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "store_items_usual_price_cents_not_negative": {
+          "name": "store_items_usual_price_cents_not_negative",
+          "value": "\"store_items\".\"usual_price_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

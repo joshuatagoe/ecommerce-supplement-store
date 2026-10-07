@@ -8,6 +8,20 @@
       "when": 1791324344686,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791335021931,
+      "tag": "0001_money_core",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791335023190,
+      "tag": "0002_money_core_triggers",
+      "breakpoints": true
     }
   ]
 }
