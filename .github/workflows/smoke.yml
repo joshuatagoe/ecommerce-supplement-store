@@ -1,0 +1,27 @@
+name: Smoke
+
+# After each merge to main, Render deploys it. This waits until the live site
+# serves this commit, then checks health, the portal sign-in and a pay link
+# (ARCHITECTURE.md §13, D36). It only reads the live site.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke test the live site once it serves this commit
+        run: npm run smoke -- --commit "${GITHUB_SHA::7}" --wait 900
