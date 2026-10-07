@@ -17,6 +17,8 @@ function storeItem(page: Page, name: string): Locator {
 }
 
 async function expectNoAxeViolations(page: Page) {
+  // Next.js streams a dynamic page's <title> in after its content; check the settled page.
+  await expect(page).toHaveTitle(/\S/);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();

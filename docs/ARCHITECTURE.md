@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D58). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D62). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -394,7 +394,7 @@ All money is **integer cents**. Every timestamp is `timestamptz`, stored in UTC.
 - **Statuses** are `text` with a `CHECK` on exactly these words: orders `draft`, `sent`, `needs_review`, `paid`, `cancelled`; payment attempts `pending`, `succeeded`, `declined`, `failed`; `settled_by` `request`, `sweep`; `actor_type` `provider`, `patient`, `sweep`, `system`.
 - **`ref`** is unique `text`, stored the way links show it (`K7Q2-M9XD`). Orders generates it (M3).
 - **Anything unknown until Send is NULL:** an order's four totals, `fee_rate_bps`, `link_version`, `link_expires_at` and `sent_at`, and a line's frozen columns. A draft needs only `ref`, `provider_id`, `practice_id`, `patient_id` and `status`. A draft line needs only `order_id`, `catalog_item_id`, `quantity` and `unit_price_cents`.
-- **Defaults:** `created_at`, `updated_at` and `order_events.at` default to `now()`. `order_events.kind` is free text: `created`, `price_changed`, `sent`, `link_sent`, `new_link`, `cancelled` and `draft_discarded` so far. Orders writes every timestamp from its own clock rather than the column default, so the seed can build history through the real code (D57). `actor_id` is a `uuid`, empty for the sweep and the system.
+- **Defaults:** `created_at`, `updated_at` and `order_events.at` default to `now()`. `order_events.kind` is free text: `created`, `price_changed`, `sent`, `link_sent`, `new_link`, `cancelled`, `draft_discarded`, `needs_review`, `paid` and `payment_not_charged`. Orders writes every timestamp from its own clock rather than the column default, so the seed can build history through the real code (D57). `actor_id` is a `uuid`, empty for the sweep and the system.
 
 **Not in our database:**
 - **The payment stub's records** live in their own file, so stopping our database doesn't wipe the payment company's memory.
@@ -547,8 +547,8 @@ Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, messag
 | Route or action | Contract |
 |---|---|
 | `GET /pay/[token]` | Server-rendered page in one of the six states ([§6](#6-pay-links)). Failed signature: 404 and the "isn't valid" page. |
-| `pay` (server action, posted by a `<form>`, so it works without JavaScript) | Input `token`, `payKey`, `card`. Returns `{ outcome: 'paid' \| 'declined' \| 'not_charged' \| 'in_progress' \| 'confirming' }`. |
-| `GET /pay/[token]/events` | `text/event-stream`. `event: status` with `data: {"state": "paid"}`. The first event is the current state. A `: ping` every 15 s. Closes after 5 minutes. |
+| `pay` (server action, posted by a `<form>`, so it works without JavaScript) | Input `token`, `payKey`, `card`. Payments returns `{ outcome: 'paid' \| 'declined' \| 'not_charged' \| 'in_progress' \| 'confirming' }`, and the action turns it into a reload of the pay page: `?notice=paid`, `declined` or `not-charged`, or no notice for the two confirming outcomes (D60). Only a mistyped card field comes back to the form, with its message by the field. In stub mode a card that isn't a test card is refused before any attempt is saved. |
+| `GET /pay/[token]/events` | `text/event-stream`. `event: status` with `data: {"state": "paid"}`. The first event is the current state. A `: ping` every 15 s, which also rechecks the state. After 5 minutes, `event: done`, then it closes (D61). A link that isn't valid gets a 404. |
 
 **Operations:**
 - `GET /api/health` returns `200 { ok: true, db: "up", migrations: "current", applied: 4, latest: "0003_money_core_gaps", milestone: "S1", commit: "c3eee65" }`, or 503 with the same fields (D51). It also says which build is answering:
@@ -781,7 +781,7 @@ CI runs only on GitHub, and the README links to its runs so graders reading GitL
 | `AUTOSAVE_DEBOUNCE_MS` | 1,000 | Same | — |
 | `PAYMENTS_MODE` | `stub` | `stripe` | Test cards exist only in `stub` |
 | `APP_URL` | the live URL | the live URL | Where pay links point; `http://localhost:3000` when unset |
-| Secrets | `DATABASE_URL` (direct connection), `JWT_SECRET` and `LINK_SIGNING_KEY` (each at least 32 characters), `STUB_STORE_PATH` | Same, minus the stub | Never committed |
+| Secrets | `DATABASE_URL` (direct connection), `JWT_SECRET` and `LINK_SIGNING_KEY` (each at least 32 characters), `STUB_STORE_PATH` (`.data/stub-payments.json` if unset, ignored by git) | Same, minus the stub | Never committed |
 
 ## 15. Repository layout
 
@@ -799,7 +799,7 @@ src/
   shared/               runs in the browser and on the server: pricing/, money.ts, status.ts, schemas.ts
                         (server/ and shared/ import each other by relative path with the .ts extension, D52)
   ui/                   components/, tokens.css, fonts/
-instrumentation.ts      starts the sweep (Node runtime only)
+src/instrumentation.ts  starts the sweep (Node runtime only; Next.js wants it inside src/ when src/ exists)
 drizzle/                SQL migrations (committed)
 scripts/                setup, migrate, verify, push, check-skills, seed, reconcile, sweep, smoke, drill-outage
 tests/                  golden/, unit/, integration/, e2e/, load/ (k6)
@@ -838,6 +838,7 @@ Each milestone is a vertical slice with a check that proves it. Cards are seeded
 - **The last draft save wins.** Two people editing the same draft can overwrite each other.
 - **The sweep needs an always-on server in production.** It runs from Next.js's `instrumentation.ts`, which is documented for monitoring, not background work.
 - **SSE across several servers needs a direct database connection** for LISTEN. Transaction-mode connection poolers don't support it.
+- **The stub payment company's records are lost when Render restarts the app,** because Render Free has no lasting disk. An attempt pending across a restart is then looked up as "never seen" and failed, even for a card that charged (0101). Demo only; a real payment company keeps its own records.
 - **Unconfirmed: whether Neon suspends while our LISTEN connection is open.** If it doesn't, the database stays awake while the app is up. That still fits Neon's free compute while Render Free sleeps. Checked when M4's SSE is deployed.
 - **The Level 3 load test measures the laptop more than the design.**
 - **The order counts depend on a $100 average order value,** which isn't published anywhere.

@@ -186,3 +186,16 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 39. **The AI's first patient picker never opened.** Search results arrived after the typing that should have opened the list, and React Aria doesn't open a closed list when its items change. The browser tests caught it; the list now opens as soon as typing starts and says "Searching…" until results come back.
 40. **Next.js 16 logs every server action with its arguments in development,** so patient search text ("Sam") appeared in the dev server's terminal. That breaks §10's rule that search text never reaches a log. Found by reading the dev log while debugging item 39; `logging.serverFunctions` is now off.
+
+## 2026-10-07 — M4 (Pay)
+
+### What worked
+
+- **One test per row of the §5 "breaks" table.** Each is a real transaction on a scratch database, with the stub's own file, and a test-only hook that makes the step 5 write fail after an approval. The 0101 and 0200 cards also run end to end in the browser, where the page updates itself over SSE when the sweep settles the payment.
+- **Breaking the payment code on purpose.** A timeout shown as "declined", an expired link allowed to pay, and a sweep that charges instead of asking each turned tests red.
+- **Repeating an intermittent failure until its cause showed.** An axe check failed once in two runs. Five repeats showed the same rule each time: no `<title>` (item 41).
+
+### Where AI misled us or we course-corrected
+
+41. **The AI's first axe checks ran before Next.js 16 had streamed the new page's `<title>`.** A dynamic page's title arrives after its content, so axe sometimes saw a page with no title. The checks now wait for the title. It's a test timing problem, not a page defect: the title is always there once the page settles.
+42. **The AI's tests looked for one `role="alert"` and found two.** Next.js adds a route announcer with that role. The tests now look for the alert by its text.

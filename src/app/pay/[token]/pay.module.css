@@ -1,0 +1,254 @@
+/* The patient's page: phone first, Atkinson Hyperlegible Next at 19px with a
+   line height of 1.5 (§9). It should read like the provider's own store. */
+.patient {
+  font-family: var(--font-patient);
+  font-size: 19px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.store {
+  padding: var(--space-3) var(--space-4);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.store p {
+  max-width: 560px;
+  margin: 0 auto;
+  font-weight: 700;
+}
+
+.main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.main h1 {
+  font-size: 1.6rem;
+}
+
+.lede {
+  margin: var(--space-2) 0 var(--space-5);
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.itemName p {
+  margin: 0;
+}
+
+.itemName p:first-child {
+  font-weight: 700;
+}
+
+.itemPrice {
+  text-align: right;
+}
+
+.itemPrice p {
+  margin: 0;
+}
+
+.price {
+  font-weight: 700;
+}
+
+.save {
+  color: var(--success);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: 1.25rem;
+}
+
+.form {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 2px solid var(--text);
+}
+
+.form h2 {
+  font-size: 1.3rem;
+  margin-bottom: var(--space-4);
+}
+
+.field {
+  margin-bottom: var(--space-4);
+}
+
+.field label {
+  display: block;
+  font-weight: 700;
+}
+
+.hint {
+  margin: 0 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.field input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-3);
+  border: 2px solid var(--input-border);
+  border-radius: var(--radius);
+  font-size: 1.1rem;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--error);
+  border-width: 3px;
+}
+
+.fieldError {
+  margin: 0 0 var(--space-1);
+  color: var(--error);
+  font-weight: 700;
+}
+
+.pay {
+  width: 100%;
+  min-height: 56px;
+  font-size: 1.15rem;
+}
+
+.paying {
+  min-height: 1.5em;
+  margin: var(--space-2) 0 0;
+}
+
+.errorSummary {
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 3px solid var(--error);
+  border-radius: var(--radius);
+  background: var(--error-tint);
+  color: var(--text);
+}
+
+.errorSummary p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.errorSummary ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+}
+
+.errorSummary a {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.receipt {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4);
+  border: 2px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--success-tint);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.receipt div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.receipt dt {
+  color: var(--text-muted);
+}
+
+.receipt dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.testCards {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+.testCards summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: var(--target);
+  display: flex;
+  align-items: center;
+}
+
+.testCards table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.testCards th,
+.testCards td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cardNumber {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  min-height: 1.5em;
+}
+
+.help {
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 380px) {
+  .item {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .itemPrice {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .cardNumber {
+    white-space: normal;
+  }
+}

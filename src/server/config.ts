@@ -42,3 +42,42 @@ export function linkTtlDays(): number {
 export function autosaveDebounceMs(): number {
   return whole("AUTOSAVE_DEBOUNCE_MS", 1000);
 }
+
+/** Which payment company: the stub with its test cards, or (later) Stripe. */
+export function paymentsMode(): "stub" | "stripe" {
+  return process.env.PAYMENTS_MODE === "stripe" ? "stripe" : "stub";
+}
+
+/** How long Pay waits for the payment company before showing "confirming" (§5). */
+export function paymentTimeoutMs(): number {
+  return whole("PAYMENT_TIMEOUT_MS", 10_000);
+}
+
+/** How often the sweep runs. It also runs once at server start. */
+export function sweepEveryMs(): number {
+  return whole("SWEEP_EVERY_MS", 5_000);
+}
+
+/** How long an attempt may stay pending before the sweep asks about it; longer than the payment timeout. */
+export function sweepAfterMs(): number {
+  return whole("SWEEP_AFTER_MS", 15_000);
+}
+
+/** The stub's pause before approving card 0309; shorter than the payment timeout. */
+export function stubSlowApproveMs(): number {
+  return whole("STUB_SLOW_APPROVE_MS", 7_000);
+}
+
+/** Where the stub payment company keeps its records, apart from our database. */
+export function stubStorePath(): string {
+  return process.env.STUB_STORE_PATH || ".data/stub-payments.json";
+}
+
+/** The confirming page's stream: a heartbeat, and how long before it closes (§5). */
+export function sseHeartbeatMs(): number {
+  return whole("SSE_HEARTBEAT_MS", 15_000);
+}
+
+export function sseMaxMs(): number {
+  return whole("SSE_MAX_MS", 300_000);
+}
