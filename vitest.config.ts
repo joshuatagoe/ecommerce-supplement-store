@@ -49,6 +49,10 @@ export default defineConfig({
           name: "integration",
           include: ["tests/integration/**/*.test.ts"],
           globalSetup: ["tests/integration/global-setup.ts"],
+          // Real-Postgres files run side by side; the slowest (300 random lines
+          // through Pricing and the database) takes 2.5 s alone and over 5 s
+          // under that load, so 5 s made it flaky (D77). The assertions are unchanged.
+          testTimeout: 20_000,
         },
       },
     ],

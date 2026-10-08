@@ -226,3 +226,15 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 - **Checking the money, not just the speed, after every run.** Even at Level 3, where a quarter of requests failed, reconciliation was clean and every charge was a recorded payment. A speed-only test couldn't have shown that.
 - **Reading the server's log during a passing run.** Level 1 passed every threshold, but one "Connection terminated unexpectedly" in the log led to the missing pool error handler (D72), which the outage drill then proved.
 - **Measuring before naming a bottleneck.** Per-step timings and CPU samples during Level 2 showed the app server at its one-core ceiling and Postgres at 40%. Without them, the pool or the stub's file would have been plausible guesses.
+
+## 2026-10-07 — M9 (README, final logs, demo script)
+
+### What worked
+
+- **Checking the README's numbers instead of trusting them.** `npm run verify` now fails if the README's two test counts don't match a fresh run (D74), so the first thing graders read can't drift from the code.
+- **Scripting the demo with the browser tests' selectors.** The video's steps run the same way every take, and a quick headless run (`DEMO_PAUSE=0 DEMO_HEADLESS=1`) checks the script still matches the app before recording (D75).
+
+### Where AI misled us or we course-corrected
+
+45. **The architecture doc, written with the AI before the build, described things that were never built.** It said every request gets a request ID, and it listed `sweep` and `verify:full` commands and a shared component kit (Money, LineEditor, DataTable and others) that the build never needed. The M9 sweep checked the doc against the code: request IDs are now marked planned and parked under Later, and the command list and component diagram name what exists.
+46. **A property test the AI wrote in M1 used Vitest's default 5-second timeout.** It takes 2.5 s alone and over 5 s with the other database files running beside it, so verify failed once in M9. The integration tests now get 20 seconds (D77); the test itself is unchanged.

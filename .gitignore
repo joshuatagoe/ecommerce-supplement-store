@@ -26,3 +26,6 @@ test-results
 
 # Load-test run files (M8): the k6 context and raw results
 tests/load/.run/
+
+# Test reports written by verify (the README check reads the count)
+tests/.results/
