@@ -238,3 +238,9 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 45. **The architecture doc, written with the AI before the build, described things that were never built.** It said every request gets a request ID, and it listed `sweep` and `verify:full` commands and a shared component kit (Money, LineEditor, DataTable and others) that the build never needed. The M9 sweep checked the doc against the code: request IDs are now marked planned and parked under Later, and the command list and component diagram name what exists.
 46. **A property test the AI wrote in M1 used Vitest's default 5-second timeout.** It takes 2.5 s alone and over 5 s with the other database files running beside it, so verify failed once in M9. The integration tests now get 20 seconds (D77); the test itself is unchanged.
+
+## 2026-10-08 — L1 (the fee on each line, and Max profit)
+
+### Where AI misled us or we course-corrected
+
+47. **The AI's pricing screens showed "You earn" without the fee it comes after.** Testing M4, the user read "You earn $15.73" at $36.00 as ignoring the 0.75% fee. The money was right, because the margin is what's left after the fee (D5), but nothing on the screen said so. Every place a price is set now shows the cost and fee under "You earn" (D78).

@@ -98,6 +98,25 @@ test("No profit sets the lowest price", async ({ page }) => {
   await expect(magnesium.getByText("You earn $0.00")).toBeVisible();
 });
 
+test("Max profit sets the retail price, and the fee shows next to what the provider earns", async ({ page }) => {
+  await signIn(page);
+  const magnesium = storeItem(page, "Magnesium Glycinate");
+  // At $36.00 the 0.75% fee is 27¢, rounded up (D17); it shows under "You earn".
+  await expect(magnesium.getByText("Fee $0.27")).toBeVisible();
+
+  await magnesium.getByRole("button", { name: "Max profit" }).click();
+  await expect(magnesium.getByLabel("Usual price")).toHaveValue("40.00");
+  await expect(magnesium.getByText("You earn $19.70")).toBeVisible();
+  await expect(magnesium.getByText("Fee $0.30")).toBeVisible();
+  // Retail is the highest allowed price, so it saves; 1¢ more is refused (above).
+  await magnesium.getByRole("button", { name: "Save" }).click();
+  await expect(magnesium.getByRole("status")).toContainText("Saved");
+
+  await magnesium.getByLabel("Usual price").fill("36.00");
+  await magnesium.getByRole("button", { name: "Save" }).click();
+  await expect(magnesium.getByRole("status")).toContainText("Saved");
+});
+
 test("an added item starts at the no-profit price, and Remove takes it out", async ({ page }) => {
   await signIn(page);
   const add = page.getByRole("button", { name: /^Add .+ to My store$/ }).first();

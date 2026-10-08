@@ -159,18 +159,20 @@ function StoreItemForm({ item, feeRateBps, focusOnMount, onRemoved }: FormProps)
 
   const cents = parseDollars(text);
   const earning = cents === null ? null : unitSplit({ priceCents: cents, costCents: item.costCents, feeRateBps });
-  const hint =
+  // One line each under the field; a list is one line of labelled amounts.
+  const hint: (string | string[])[] =
     cents === null
       ? ["Enter a price like 36.00."]
       : [
           `You earn ${formatCents(earning!.marginCents)}`,
+          [`Cost ${formatCents(item.costCents)}`, `Fee ${formatCents(earning!.feeCents)}`],
           cents > item.msrpCents
             ? `Above the retail price, ${formatCents(item.msrpCents)}`
             : `Patient saves ${formatCents(item.msrpCents - cents)} vs retail`,
         ];
 
   // "You earn" is announced once typing pauses, never on every keystroke (§9).
-  const spoken = hint.join(". ");
+  const spoken = hint.map((part) => (Array.isArray(part) ? part.join(", ") : part)).join(". ");
   useEffect(() => {
     const timer = setTimeout(() => setAnnouncement(spoken), 1000);
     return () => clearTimeout(timer);
@@ -201,8 +203,9 @@ function StoreItemForm({ item, feeRateBps, focusOnMount, onRemoved }: FormProps)
     });
   }
 
-  function noProfit() {
-    change(centsToField(item.lowestPriceCents));
+  /** No profit and Max profit fill in the ends of the allowed range: the lowest price and retail. */
+  function fill(priceCents: number) {
+    change(centsToField(priceCents));
     setError(null);
   }
 
@@ -244,9 +247,17 @@ function StoreItemForm({ item, feeRateBps, focusOnMount, onRemoved }: FormProps)
           />
         </div>
         <p id={`${id}-hint`} className={styles.hint}>
-          {hint.map((part) => (
-            <span key={part}>{part}</span>
-          ))}
+          {hint.map((part) =>
+            Array.isArray(part) ? (
+              <span key={part.join()} className={styles.amounts}>
+                {part.map((amount) => (
+                  <span key={amount}>{amount}</span>
+                ))}
+              </span>
+            ) : (
+              <span key={part}>{part}</span>
+            ),
+          )}
         </p>
         {error && (
           <p id={`${id}-error`} className={styles.fieldError} role="alert">
@@ -258,8 +269,11 @@ function StoreItemForm({ item, feeRateBps, focusOnMount, onRemoved }: FormProps)
         </span>
       </div>
       <div className={styles.actions}>
-        <button type="button" className="button" onClick={noProfit} disabled={pending}>
+        <button type="button" className="button" onClick={() => fill(item.lowestPriceCents)} disabled={pending}>
           No profit
+        </button>
+        <button type="button" className="button" onClick={() => fill(item.msrpCents)} disabled={pending}>
+          Max profit
         </button>
         <button type="submit" className="button button-primary" disabled={pending}>
           Save
