@@ -11,6 +11,7 @@ import {
   newLink,
   type OrdersContext,
   recentOrders,
+  recentPatients,
   saveDraft,
   sendOrder,
   startOrder,
@@ -440,6 +441,50 @@ describe("reading orders", () => {
     const recent = await recentOrders(ctx(new Date("2026-10-07T12:00:00Z")), clinic.provider, clinic.patientId);
     expect(recent.map((order) => order.ref)).toEqual([second.ref, first.ref]);
     expect(recent[0]).toMatchObject({ display: "sent", totalCents: 3600, itemCount: 1 });
+  });
+});
+
+describe("recentPatients (F2 step 1, before any typing)", () => {
+  const at = (day: number) => new Date(Date.UTC(2026, 8, day, 12));
+  const addPatient = (practiceId: string, first: string) =>
+    scratch.pool
+      .query("INSERT INTO patients (practice_id, first_name, last_name, email) VALUES ($1, $2, 'Test', $3) RETURNING id", [
+        practiceId,
+        first,
+        `${first}.${randomUUID().slice(0, 6)}@example.com`.toLowerCase(),
+      ])
+      .then((result) => result.rows[0].id as string);
+  const addProvider = (practiceId: string) =>
+    scratch.pool
+      .query("INSERT INTO providers (practice_id, display_name) VALUES ($1, 'Dr. Lee') RETURNING id", [practiceId])
+      .then((result) => ({ id: result.rows[0].id as string, practiceId }));
+
+  it("lists the patients this provider last started orders for, newest first, once each, ten at most", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    await startOrder(ctx(at(1)), clinic.provider, { patientId: clinic.patientId });
+    const others: string[] = [];
+    for (const [i, first] of ["Ana", "Ben", "Cy", "Di", "Ed", "Flo", "Gus", "Hal", "Ivy", "Jo", "Kai"].entries()) {
+      const id = await addPatient(clinic.practiceId, first);
+      others.push(id);
+      await startOrder(ctx(at(2 + i)), clinic.provider, { patientId: id });
+    }
+    await startOrder(ctx(at(20)), clinic.provider, { patientId: clinic.patientId });
+
+    const recent = await recentPatients(ctx(), clinic.provider);
+    // Ana and Ben, the two oldest, drop off.
+    expect(recent.map((p) => p.id)).toEqual([clinic.patientId, ...others.slice(2).reverse()]);
+    expect(recent[1]).toEqual({ id: others[10], name: "Kai Test" });
+  });
+
+  it("never lists another provider's patients, and is empty for a provider with no orders", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const lee = await addProvider(clinic.practiceId);
+    const leesPatient = await addPatient(clinic.practiceId, "Gia");
+    await startOrder(ctx(at(3)), lee, { patientId: leesPatient });
+    await startOrder(ctx(at(4)), clinic.provider, { patientId: clinic.patientId });
+
+    expect((await recentPatients(ctx(), clinic.provider)).map((p) => p.id)).toEqual([clinic.patientId]);
+    expect(await recentPatients(ctx(), await addProvider(clinic.practiceId))).toEqual([]);
   });
 });
 

@@ -122,7 +122,7 @@ Things that can go wrong:
 
 ### F2 — Provider creates an order and sends the link
 
-1. Open **New order** and choose a patient (from the EHR; seeded in the slice). That patient's recent orders appear with **Order again**, which starts a new draft with the same items, quantities and prices (D31).
+1. Open **New order** and choose a patient (from the EHR; seeded in the slice): search by name, or pick one of **Recent patients**, the last ten this provider started orders for (D79). Patients are registered in the EHR, so there's no Add patient here. That patient's recent orders appear with **Order again**, which starts a new draft with the same items, quantities and prices (D31).
 2. Pick items from My store and a quantity of 1–10 for each (D28). Each starts at the usual price (D10).
 3. Change a price or margin for this patient if needed (D5). Each line shows the price, "You earn" with the cost and fee it comes after, and the saving vs retail. **No profit** and **Max profit** set the line to the lowest price or to retail; in margin mode they set the margin those prices earn (D78). The order shows a total and the provider's total earnings. The draft saves itself (D26).
 4. Review, then **Send**. The order locks. We create a signed link that works for 30 days (D25).
