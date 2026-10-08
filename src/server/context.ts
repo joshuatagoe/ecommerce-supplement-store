@@ -20,8 +20,10 @@ import type { OrdersContext } from "./orders/index.ts";
 import type { PaymentsContext } from "./payments/index.ts";
 import type { PaymentGateway } from "./ports/payment-gateway.ts";
 
-export function ordersContext(): OrdersContext {
+/** The request's ID goes on its log lines (D85); pages and actions pass `await requestId()`. */
+export function ordersContext(requestId?: string): OrdersContext {
   return {
+    requestId,
     db,
     now: () => new Date(),
     feeRateBps: feeRateBps(),
@@ -45,8 +47,9 @@ function gateway(): PaymentGateway {
   return cache.stubGateway;
 }
 
-export function paymentsContext(): PaymentsContext {
+export function paymentsContext(requestId?: string): PaymentsContext {
   return {
+    requestId,
     db,
     now: () => new Date(),
     gateway: gateway(),

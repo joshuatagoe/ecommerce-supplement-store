@@ -29,6 +29,8 @@ export type PaymentsContext = {
   /** How long an attempt may stay pending before the sweep asks about it (SWEEP_AFTER_MS). */
   sweepAfterMs: number;
   linkSigningKey: string;
+  /** The request this work is for, on its log lines (§11, D85); none for the sweep. */
+  requestId?: string;
   /** Tests only: a way to make step 5 fail after the payment company approved. */
   hooks?: { beforeRecordSuccess?: () => Promise<void> };
 };
@@ -216,7 +218,7 @@ async function recordSuccess(
       throw error;
     });
   if (from === null) return false;
-  logStatusChange({ ref: attempt.ref, from, to: "paid", actor: settledBy === "request" ? "patient" : "sweep" });
+  logStatusChange({ ref: attempt.ref, from, to: "paid", actor: settledBy === "request" ? "patient" : "sweep", requestId: ctx.requestId });
   return true;
 }
 
@@ -246,7 +248,7 @@ async function markNeedsReview(ctx: PaymentsContext, attempt: { attemptId: strin
     await notifyStatusChange(tx, attempt.ref);
     return true;
   });
-  if (changed) logStatusChange({ ref: attempt.ref, from: "sent", to: "needs_review", actor: "system" });
+  if (changed) logStatusChange({ ref: attempt.ref, from: "sent", to: "needs_review", actor: "system", requestId: ctx.requestId });
 }
 
 // --------------------------------------------------------------------- sweep
@@ -313,7 +315,7 @@ async function recordNotCharged(ctx: PaymentsContext, attempt: { attemptId: stri
     await notifyStatusChange(tx, attempt.ref);
     return back.length === 1;
   });
-  if (reopened) logStatusChange({ ref: attempt.ref, from: "needs_review", to: "sent", actor: "sweep" });
+  if (reopened) logStatusChange({ ref: attempt.ref, from: "needs_review", to: "sent", actor: "sweep", requestId: ctx.requestId });
   return reopened !== null;
 }
 

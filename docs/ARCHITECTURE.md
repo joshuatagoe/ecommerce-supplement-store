@@ -675,11 +675,32 @@ The target is **WCAG 2.2 AA**.
 
 ## 11. Observability
 
-- **Logs:** pino writes structured JSON, with patient fields redacted. Planned but not built: a request ID on every request and in every log line, parked with the rest of the observability work for after the build (status board, "Later").
-- **One log line per status change**, with the order ref, the old and new status, and the actor. No patient data.
+- **Logs:** pino writes structured JSON, with patient fields redacted. They go to the server's output, which Render keeps and shows in its dashboard.
+- **Request IDs (D85):** `src/proxy.ts` gives every request a new ID, sends it back in an `x-request-id` response header, and passes it to the app. Pages and actions put it in the Orders and Payments contexts, so each status-change line carries the ID of the request that made it. The sweep's lines have none, because no request asked for them.
+- **One log line per status change**, with the order ref, the old and new status, the actor, and the request ID. No patient data.
+- **One log line per unexpected server error (D85),** from `onRequestError` in `src/instrumentation.ts`: the request ID, the method, the path without its query string and with any pay-link token replaced, the route, Next.js's error digest (the same one the error page reports), and the error's name and message. A database error keeps only its code, because its message can quote the data. No headers, so no cookies.
+- **The audit trail, for us:** providers see each order's trail on its Order details page. Platform staff read it in Neon's SQL editor with a saved query; the events hold no patient data:
+
+  ```sql
+  SELECT o.ref, e.at, e.kind, e.actor_type, pr.display_name AS actor, e.details
+    FROM order_events e
+    JOIN orders o ON o.id = e.order_id
+    LEFT JOIN providers pr ON pr.id = e.actor_id
+   WHERE o.ref = 'K7Q2-M9XD'
+   ORDER BY e.at, e.id;
+  ```
 - **Health:** `GET /api/health` checks the database connection and the migration version, and names the milestone and commit it serves. Render uses it to decide whether a new deploy gets traffic; the smoke test uses the commit to know the new build is live.
 - **Totals always come from the database,** never from a cache.
 - **Reconciliation** runs as a command, in CI on the seeded data, and after every load test.
+
+**In production, before real money moves.** The PRD doesn't ask for monitoring, and a demo with no real users has nothing to alert anyone about, so none of this is built (the user's call). A real store needs it, because a failing Pay page or a stuck payment has to reach someone within minutes:
+
+| Add | Why | Why it waits |
+|---|---|---|
+| **Error tracking** (Sentry or similar) | Groups errors, shows how often each happens, and links each one to its request ID and the release that caused it | An outside account, and our errors and their paths would leave our servers: a data-flow decision |
+| **Alerts** | A page down, an order in needs review for more than a few minutes, or `npm run reconcile` finding a problem should reach a person | No one would answer them for a demo; a scheduled check would also keep the free servers awake |
+| **Log shipping and dashboards** (Grafana with Loki for logs and Prometheus for metrics, or a hosted log service) | Render keeps logs for a short time and only searches them crudely. A dashboard shows Pay's response time, errors per minute and payments per hour, and Grafana can also read the database directly for business numbers | Another outside account, and the logs would need the same no-patient-data review |
+| **Request tracing** (OpenTelemetry, viewed in Grafana Tempo, Honeycomb or Sentry) | Shows each step of a slow request and how long it took, the way LangSmith or Langfuse show each step of an agent run. Next.js already makes the spans once a tracer is set up | Our request IDs cover matching a problem to its log lines for now |
 
 ## 12. Stack and hosting
 

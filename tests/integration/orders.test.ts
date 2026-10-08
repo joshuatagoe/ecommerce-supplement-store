@@ -1,10 +1,11 @@
 // Orders against real Postgres with real transactions (ARCHITECTURE.md §4, §8,
 // F2): drafts, Send, signed links, New link, Cancel order, Order again.
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { logLinkSender } from "@/server/adapters/log-link-sender";
 import { seededPatients } from "@/server/adapters/seeded-patients";
 import { linkToken, orderForToken } from "@/server/links";
+import { log } from "@/server/log";
 import {
   cancelOrder,
   getOrder,
@@ -345,6 +346,26 @@ describe("newLink", () => {
     expect(await newLink(ctx(), clinic.provider, ref)).toMatchObject({ ok: false, error: { code: "PAYMENT_IN_PROGRESS" } });
     const draft = await draftFor(clinic);
     expect(await newLink(ctx(), clinic.provider, draft)).toMatchObject({ ok: false, error: { code: "ORDER_NOT_SENT" } });
+  });
+});
+
+describe("request IDs in the log (§11, L3)", () => {
+  it("tags each status change with the ID of the request that made it", async () => {
+    const info = vi.spyOn(log, "info");
+    try {
+      const clinic = await makeClinic(scratch.pool);
+      const ref = await draftFor(clinic);
+      await saveDraft(ctx(), clinic.provider, { ref, lines: [{ catalogItemId: clinic.magnesiumId, quantity: 1, priceCents: 3600 }] });
+      await sendOrder({ ...ctx(), requestId: "req-send" }, clinic.provider, ref);
+      await cancelOrder({ ...ctx(), requestId: "req-cancel" }, clinic.provider, ref);
+      const changes = info.mock.calls.map(([line]) => line as Record<string, unknown>).filter((line) => line.ref === ref);
+      expect(changes).toEqual([
+        expect.objectContaining({ event: "status_changed", to: "sent", requestId: "req-send" }),
+        expect.objectContaining({ event: "status_changed", to: "cancelled", requestId: "req-cancel" }),
+      ]);
+    } finally {
+      info.mockRestore();
+    }
   });
 });
 

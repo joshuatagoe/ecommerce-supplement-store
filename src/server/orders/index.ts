@@ -34,6 +34,8 @@ export type OrdersContext = {
   appUrl: string;
   linkTtlDays: number;
   linkSender: LinkSender;
+  /** The request this work is for, on its log lines (§11, D85); none for the seed or tests. */
+  requestId?: string;
 };
 
 /** Who is acting: the signed-in provider (Access). */
@@ -81,7 +83,7 @@ async function changing<T extends ActionResult>(
   body: (tx: Tx) => Promise<{ result: T; change?: { ref: string; from: string; to: string } }>,
 ): Promise<T> {
   const { result, change } = await ctx.db.transaction(body);
-  if (change) logStatusChange({ ...change, actor: "provider" });
+  if (change) logStatusChange({ ...change, actor: "provider", requestId: ctx.requestId });
   return result;
 }
 

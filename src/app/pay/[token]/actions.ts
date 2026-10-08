@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { redirect, unstable_rethrow } from "next/navigation";
+import { requestId } from "@/app/request-id";
 import { paymentsContext } from "@/server/context";
 import { type PayOutcome, pay } from "@/server/payments";
 import { payInput } from "@/shared/schemas";
@@ -49,7 +50,7 @@ export async function payAction(_previous: PayFormState, form: FormData): Promis
 
   let outcome: PayOutcome;
   try {
-    const result = await pay(paymentsContext(), parsed.data);
+    const result = await pay(paymentsContext(await requestId()), parsed.data);
     if (!result.ok) {
       if (result.error.field) {
         return { payKey: parsed.data.payKey, errors: { [result.error.field]: result.error.message }, values };

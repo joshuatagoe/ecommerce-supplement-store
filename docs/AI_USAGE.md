@@ -251,3 +251,9 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 ### Where AI misled us or we course-corrected
 
 49. **The AI first made Sales' shortcuts in-app links, and the filter fields kept showing the old values.** After "Waiting for payment" the URL and the list said Sent, but the Status field still said All statuses, because an in-app navigation keeps the form's fields. Re-creating the form on each change then left the old form in the page beside the new one, so the field's label pointed at the stale copy. The browser test that checks the field caught both. The shortcuts are now plain links that load the page fresh, like the filter form itself (D80).
+
+## 2026-10-08 — L3 (request IDs and error logs)
+
+### Where AI misled us or we course-corrected
+
+50. **The AI's first plan for tagging log lines wouldn't have worked.** It meant to set the request ID once, inside the sign-in check every portal action calls, using Node's request-scoped storage. A five-line probe on Node 24 showed a value set inside a called function never reaches the function that called it, so every action's log lines would have had no ID. The ID now travels in the Orders and Payments contexts, like the clock and the link sender (D85).
