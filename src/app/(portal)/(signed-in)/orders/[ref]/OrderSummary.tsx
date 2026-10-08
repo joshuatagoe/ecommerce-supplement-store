@@ -37,6 +37,8 @@ function describe(event: AuditEvent, order: OrderView): string {
       return `Sent${by}`;
     case "link_sent":
       return "Link sent to the patient (email is stubbed in this demo)";
+    case "new_link_requested":
+      return "New link sent at the patient's request (the old one had expired)";
     case "new_link":
       return `New link made${by}; the old link stopped working`;
     case "needs_review":
@@ -165,7 +167,7 @@ export function OrderSummary({ order, audit, notice, timeZone }: Props) {
               isDisabled={pending}
               onConfirm={() => run(newLinkAction)}
             >
-              <p>The current link stops working, and the new one works for 30 days.</p>
+              <p>The current link stops working, and the new one works for 90 days.</p>
             </ConfirmDialog>
           )}
           {can("cancel_order") && (

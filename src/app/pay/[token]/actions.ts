@@ -3,7 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { requestId } from "@/app/request-id";
-import { paymentsContext } from "@/server/context";
+import { ordersContext, paymentsContext } from "@/server/context";
+import { requestNewLink } from "@/server/orders";
 import { type PayOutcome, pay } from "@/server/payments";
 import { payInput } from "@/shared/schemas";
 
@@ -77,4 +78,16 @@ export async function payAction(_previous: PayFormState, form: FormData): Promis
       // in_progress and confirming: the page shows "We're confirming your payment".
       redirect(page);
   }
+}
+
+/**
+ * "Send me a new link" on an expired link (L7, D87), posted by a <form>, so it
+ * works without JavaScript. The fresh link goes to the email on file; this
+ * page shows neither it nor the order. Anything else returns to the link,
+ * which shows the order's state, or a 404 for a link that isn't valid.
+ */
+export async function requestNewLinkAction(form: FormData): Promise<void> {
+  const token = String(form.get("token") ?? "");
+  const result = await requestNewLink(ordersContext(await requestId()), token);
+  redirect(result.ok ? "/pay/link-sent" : `/pay/${encodeURIComponent(token)}`);
 }

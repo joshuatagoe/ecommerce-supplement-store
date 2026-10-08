@@ -222,12 +222,12 @@ stateDiagram-v2
 | Draft → Draft | Provider edits | Always. Out-of-range prices are saved too, so no work is lost. | "Saving…", "Saved", or "Not saved, retrying". An out-of-range line shows the allowed range, and Send is disabled. | — |
 | Draft → **Sent** | **Send** | At least one line, and every price in range against **today's** cost and retail price | "Sent to Sam", with the link and **Copy link**. The order locks. | The link works |
 | Draft → **Cancelled** | **Discard draft** | Always | "Draft discarded" | — |
-| Sent → Sent | **New link** | No payment in progress | A new link. The old link stops working, and the 30 days restart. | The old link shows "isn't valid" |
+| Sent → Sent | **New link** | No payment in progress | A new link. The old link stops working, and the 90 days restart. | The old link shows "isn't valid" |
 | Sent → **Paid** | Patient's Pay, or the sweep | The Pay flow | "Paid. You earned $15.73." | Receipt |
 | Sent → **Needs review** | System | The payment company gave no clear answer | "Needs review. We're confirming a payment; nothing for you to do." | "We're confirming your payment" |
 | Needs review → Paid or Sent | The sweep | Charged, or confirmed not charged | Paid, or back to Sent | Receipt, or "Your payment didn't go through. You haven't been charged." |
 | Sent → **Cancelled** | **Cancel order** | No payment in progress | "Order cancelled" | "This order is no longer available" |
-| Sent, after 30 days | Time | — | "Expired", with New link and Cancel order | "This link has expired" |
+| Sent, after 90 days | Time | — | "Expired", with New link and Cancel order. The order never ends on its own. | "This link has expired", with **Send me a new link** (D87) |
 
 Two staff editing the same draft is out of scope; the last save wins. Each action keeps one verb throughout: Send becomes "Sent", Cancel order becomes "Order cancelled", and Discard draft becomes "Draft discarded".
 
@@ -343,10 +343,12 @@ The slow-approve demo is recorded on the laptop, because the hosted database can
 - **The order ref** (`K7Q2-M9XD`) is 8 random characters from an alphabet without 0, O, 1, I or L. It appears in links, portal URLs, and the receipt. Because it's random, it reveals nothing about how many orders exist.
 - **The signature** is `HMAC-SHA256(LINK_SIGNING_KEY, "<ref>:<link_version>")`, cut to 128 bits and base64url-encoded. The server recomputes it and compares the two with `timingSafeEqual`, so the check takes the same time whether a link is close to valid or not.
 - **The database stores no secret.** Copy link works at any time, and a double-clicked Send returns the same link.
-- **New link** raises `link_version` by one, which makes every older signature fail, and restarts the 30 days.
+- **New link** raises `link_version` by one, which makes every older signature fail, and restarts the 90 days.
 - **Changing `LINK_SIGNING_KEY` turns off every live link.** That's the cost of this design, and we accept it.
 
-**Expiry.** A link can start a payment for **30 days** after it's sent. A payment already in progress still settles after that. Expired is worked out on the fly, not stored.
+**Expiry (D87).** A link can start a payment for **90 days** after it's sent, and the checkout page says so: "This link works until January 6. After that you can ask for a new one." A payment already in progress still settles after that. Expired is worked out on the fly, not stored. The order itself never ends on its own; only the provider, or a payment, ends it.
+
+**Send me a new link (D87).** The expired page offers it. It works like New link, but it's the patient asking: the version goes up, so the expired link stops working, and the fresh link goes to the email on file through `LinkSender`, never back to the page. The page moves to `/pay/link-sent`, which shows no link and no order details. The order and its frozen price stay the same. Each expired link can ask only once, because the next link replaces it, so nobody can flood the patient's inbox. A replaced or cancelled order's link can't ask. Patient-facing words stay neutral: "ready to pay", never "overdue" or "balance due", because nothing is owed until the patient pays.
 
 **What a link shows:**
 
@@ -515,10 +517,11 @@ Every write below happens in **one transaction**. "Access" means the provider's 
 | Set a usual price | item, price | Access → Store → Pricing | `store_items` | The saved price, "You earn", the saving |
 | Start an order / Order again | patient, or the past order's ref | Access → Orders | `orders` (draft), `order_lines` (copied), event | Order ref |
 | Edit a draft (autosave) | lines: item, quantity, price or margin | Access → Orders → Pricing | `order_lines`, event "price changed" | Each line's split, with out-of-range lines flagged |
-| **Send** | ref | Access → Orders: lock the order, check every line against today's cost and MSRP, freeze the lines, set totals and fee rate, `link_version = 1`, expiry = now + 30 days | lines, order, events "sent" and "link sent", NOTIFY | Signed link |
+| **Send** | ref | Access → Orders: lock the order, check every line against today's cost and MSRP, freeze the lines, set totals and fee rate, `link_version = 1`, expiry = now + 90 days (D87) | lines, order, events "sent" and "link sent", NOTIFY | Signed link |
 | New link | ref | Access → Orders: lock, require no live attempt | order, event, NOTIFY | New link |
 | Cancel order / Discard draft | ref | Access → Orders: lock, require no live attempt | order, event, NOTIFY | New status |
 | Open a pay link | token | Access (signature) → Orders | — | One of the six states |
+| Send me a new link | token of an expired link | Access (signature) → Orders: lock, require the link to have expired and no live attempt (D87) | order, events "new link requested" and "link sent", NOTIFY | Moves to `/pay/link-sent`, which shows nothing about the order |
 | **Pay** | token, Pay key, card | [§5](#5-the-pay-flow) | attempt, order, events, NOTIFY | An outcome |
 | Status stream | token | Access → LISTEN | — | SSE events |
 | Sweep | — | Payments → `PaymentGateway.lookup` → Orders | attempt, order, events, NOTIFY | — |
@@ -669,6 +672,7 @@ The target is **WCAG 2.2 AA**.
   - Every portal query is limited to that provider. One session can't be cut off before it expires, which we accept for a fake login.
 - **Pay links** are signed and expire, and never appear in logs or `Referer` headers ([§6](#6-pay-links)).
 - **Patient data is minimal.** There is no patient name on the pay page and no product names in links or email subjects. Search text is kept out of URLs and logs; that includes Next.js's development log of server actions, which is turned off in `next.config.ts`.
+- **A pay link is probably health information under HIPAA.** It ties a clinician's supplement order to the patient's email address. Email is allowed with reasonable safeguards, which is why the link lasts 90 days, shows the minimum (no patient name), stays out of search engines and Referer headers, and stops working when it's replaced. A real launch would need a business associate agreement with each practice and with the email provider; we haven't confirmed exactly which (D87).
 - **A link holder can see and pay for that one order.** Paying only sends money in, so the risk is privacy: product names can hint at health. We accept this for the slice. The next step is a one-time code by SMS before the order is shown (DECISIONS.md, Cut). That would need the patient's phone number from the EHR.
 - **The server computes all money.** Every request is checked with Zod, and the pay action takes no amount.
 - **Secrets are environment variables:** `DATABASE_URL`, `JWT_SECRET`, `LINK_SIGNING_KEY`. None are in the repo.

@@ -20,7 +20,8 @@ export type ErrorCode =
   | "LINES_OUT_OF_RANGE"
   | "PAYMENT_IN_PROGRESS"
   | "ORDER_NOT_SENT"
-  | "ORDER_FINAL";
+  | "ORDER_FINAL"
+  | "LINK_STILL_WORKS";
 
 /** A line Send refused (LINES_OUT_OF_RANGE), so the page can mark it. */
 export type LineError = { catalogItemId: string; code: ErrorCode; message: string };

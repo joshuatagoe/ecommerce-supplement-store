@@ -20,7 +20,7 @@ import { type DisplayStatus, displayStatus, type OrderStatus, type SalesAction, 
 import type { Db, Tx } from "../db/client.ts";
 import { notifyStatusChange } from "../db/notify.ts";
 import { catalogItems, orderEvents, orderLines, orders, patients, paymentAttempts, storeItems } from "../db/schema.ts";
-import { payLink } from "../links/index.ts";
+import { orderForToken, payLink } from "../links/index.ts";
 import { logStatusChange } from "../log.ts";
 import type { LinkSender } from "../ports/link-sender.ts";
 import type { PatientMatch } from "../ports/patient-directory.ts";
@@ -412,7 +412,7 @@ export async function sendOrder(
 
 // ------------------------------------------------------------------- newLink
 
-/** §8 New link: raises the link version, which turns every older link off, and restarts the 30 days. */
+/** §8 New link: raises the link version, which turns every older link off, and restarts the link's 90 days (D87). */
 export async function newLink(
   ctx: OrdersContext,
   provider: ProviderRef,
@@ -438,6 +438,47 @@ export async function newLink(
     // An open pay page holding the old link hears this and rechecks it.
     await notifyStatusChange(tx, order.ref);
     return { ok: true, link, expiresAt: expiresAt.toISOString() };
+  });
+}
+
+// ------------------------------------------------------------ requestNewLink
+
+/**
+ * The patient's "Send me a new link" on a link that has run out (L7, D87). The
+ * fresh link goes to the email on file, never back to whoever holds the old
+ * one, and the old one stops working, so each expired link can ask only once.
+ * The order and its frozen price stay as they are.
+ */
+export async function requestNewLink(ctx: OrdersContext, token: string): Promise<ActionResult> {
+  const linked = await orderForToken(ctx.db, ctx.linkSigningKey, token);
+  if (!linked) return NOT_FOUND();
+  return ctx.db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, linked.id)).for("update");
+    // The provider may have made a new link while this request waited for the lock.
+    if (order.linkVersion !== linked.linkVersion) return NOT_FOUND();
+    if (order.status === "needs_review") return PAYMENT_IN_PROGRESS();
+    if (order.status !== "sent") return fail("ORDER_FINAL", "This order is no longer waiting for payment.");
+    const now = ctx.now();
+    if (order.linkExpiresAt! > now) return fail("LINK_STILL_WORKS", "This link still works.");
+    if (await hasPendingAttempt(tx, order.id)) return PAYMENT_IN_PROGRESS();
+
+    const version = order.linkVersion! + 1;
+    const expiresAt = new Date(now.getTime() + ctx.linkTtlDays * DAY_MS);
+    await tx
+      .update(orders)
+      .set({ linkVersion: version, linkExpiresAt: expiresAt, updatedAt: now })
+      .where(eq(orders.id, order.id));
+    const link = payLink(ctx.appUrl, ctx.linkSigningKey, order.ref, version);
+    await tx.insert(orderEvents).values({
+      orderId: order.id,
+      kind: "new_link_requested",
+      actorType: "patient",
+      at: now,
+      details: { linkVersion: version },
+    });
+    await ctx.linkSender.send(tx, { orderId: order.id, ref: order.ref, patientId: order.patientId, link, at: now });
+    await notifyStatusChange(tx, order.ref);
+    return { ok: true };
   });
 }
 

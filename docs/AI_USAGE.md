@@ -263,3 +263,10 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 ### What worked
 
 - **Three research agents in parallel, one per side, at the user's request:** pharmacy refills (CVS, Express Scripts, Amazon Pharmacy), supplement subscriptions (Fullscript, Thorne, Amazon, Ritual), and what neither covers (the rules for recurring charges, payment retries, clinical review, adherence, shipping times). Each cited its sources and marked what it couldn't confirm. Comparing them showed the first draft's 7-day lead time and hard block on early orders were tighter than any pharmacy or supplement seller, and both changed (D86).
+
+## 2026-10-08 — L7 (90-day pay links and Send me a new link)
+
+### What worked
+
+- **A quick research agent on the legal side before changing how long links last.** It found no law setting a lifetime, that Stripe and Square both expire invoice links and let the customer reissue one, that an unpaid link creates no debt, and that the link is probably health information. That turned the user's "don't let orders end" into the design: orders never end, links last 90 days, and a new link is one click away (D87).
+- **Checking the seed against the new lifetime.** With 90-day links, the seed's expired example for Dr. Rivera was no longer old enough to have expired, so the demo would have lost its Expired order. The seed now picks one that's old enough for whatever the lifetime is.
