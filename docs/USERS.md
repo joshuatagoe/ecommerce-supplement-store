@@ -111,7 +111,7 @@ Each flow lists its steps and then what happens when something goes wrong.
 
 1. Open **My store**. See the catalog: each item's name, image, our cost, lowest price, and highest price (retail).
 2. Add an item to the store.
-3. Set a **usual price** (D16). As they type, they see "You earn $X" and "Patient saves $Y vs retail". A **No profit** button sets the price to the lowest allowed.
+3. Set a **usual price** (D16). As they type, they see "You earn $X", the cost and fee it comes after as labelled amounts ("Cost $20.00", "Fee $0.27"), and "Patient saves $Y vs retail". **No profit** sets the price to the lowest allowed, and **Max profit** to the retail price (D78).
 4. Save.
 
 Things that can go wrong:
@@ -124,7 +124,7 @@ Things that can go wrong:
 
 1. Open **New order** and choose a patient (from the EHR; seeded in the slice). That patient's recent orders appear with **Order again**, which starts a new draft with the same items, quantities and prices (D31).
 2. Pick items from My store and a quantity of 1–10 for each (D28). Each starts at the usual price (D10).
-3. Change a price or margin for this patient if needed (D5). Each line shows the price, "You earn", and the saving vs retail. The order shows a total and the provider's total earnings. The draft saves itself (D26).
+3. Change a price or margin for this patient if needed (D5). Each line shows the price, "You earn" with the cost and fee it comes after, and the saving vs retail. **No profit** and **Max profit** set the line to the lowest price or to retail; in margin mode they set the margin those prices earn (D78). The order shows a total and the provider's total earnings. The draft saves itself (D26).
 4. Review, then **Send**. The order locks. We create a signed link that works for 30 days (D25).
 5. The link is "sent" to the patient. Email is stubbed, so the provider can also **Copy link**, from the confirmation or later from Sales.
 

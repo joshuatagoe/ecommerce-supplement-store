@@ -121,8 +121,15 @@
   font-size: 0.9375rem;
 }
 
-.hint span:first-child {
+.hint > span:first-child {
   font-weight: 600;
+}
+
+/* Cost and fee: labelled amounts on one line, like the cost, lowest and retail row. */
+.amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
 }
 
 .fieldError {

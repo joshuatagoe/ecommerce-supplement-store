@@ -77,7 +77,7 @@ describe("currentRelease", () => {
 
   it("shortens Render's commit to 7 characters", () => {
     vi.stubEnv("RENDER_GIT_COMMIT", "c3eee65f0e1d2c3b4a5968778695a4b3c2d1e0f9");
-    expect(currentRelease()).toEqual({ milestone: expect.stringMatching(/^(S1|M\d)$/), commit: "c3eee65" });
+    expect(currentRelease()).toEqual({ milestone: expect.stringMatching(/^(S1|M\d|L\d)$/), commit: "c3eee65" });
   });
 
   it("has no commit off Render", () => {

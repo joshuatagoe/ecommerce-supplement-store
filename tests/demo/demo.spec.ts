@@ -70,6 +70,10 @@ test("the main flow: My store, New order, Pay, where the money went, Sales", asy
   await magnesium.getByRole("button", { name: "Save" }).click();
   await expect(magnesium.getByText(/The lowest price for this item is \$20\.16/)).toBeVisible();
   await beat(page, 3000);
+  // Max profit fills in retail; the line under "You earn" shows the cost and fee it comes after (D78).
+  await magnesium.getByRole("button", { name: "Max profit" }).click();
+  await expect(magnesium.getByText("You earn $19.70")).toBeVisible();
+  await beat(page, 3000);
   await magnesium.getByLabel("Usual price").fill("");
   await magnesium.getByLabel("Usual price").pressSequentially("36.00", { delay: 150 });
   await magnesium.getByRole("button", { name: "Save" }).click();

@@ -10,7 +10,7 @@ import { Button, Group, Input, Label, NumberField, Radio, RadioGroup } from "rea
 import type { OrderView, SavedLine } from "@/server/orders";
 import type { StoreItem } from "@/server/store";
 import { centsToField, formatCents, parseDollars, priceRangeMessage } from "@/shared/money";
-import { checkPrice, lineSplit, orderTotals, priceForMarginCents, type Split } from "@/shared/pricing";
+import { checkPrice, lineSplit, orderTotals, priceForMarginCents, type Split, unitSplit } from "@/shared/pricing";
 import type { ActionError } from "@/shared/schemas";
 import { ConfirmDialog } from "@/ui/components/ConfirmDialog";
 import { ProductImage } from "@/ui/components/ProductImage";
@@ -262,6 +262,14 @@ export function DraftEditor({ order, storeItems, feeRateBps, autosaveMs }: Props
     update(w.line.catalogItemId, { mode, text });
   }
 
+  /** No profit and Max profit: the lowest price or retail, or in margin mode the margin each earns. */
+  function fill(w: Worked, end: "lowest" | "retail") {
+    const priceCents = end === "lowest" ? w.product.lowestPriceCents : w.product.msrpCents;
+    const amount =
+      w.line.mode === "price" ? priceCents : unitSplit({ priceCents, costCents: w.product.costCents, feeRateBps }).marginCents;
+    update(w.line.catalogItemId, { text: centsToField(amount) });
+  }
+
   function remove(catalogItemId: string) {
     edit((current) => current.filter((line) => line.catalogItemId !== catalogItemId));
     itemsHeading.current?.focus();
@@ -340,6 +348,7 @@ export function DraftEditor({ order, storeItems, feeRateBps, autosaveMs }: Props
                   onQuantity={(quantity) => update(w.line.catalogItemId, { quantity })}
                   onMode={(mode) => switchMode(w, mode)}
                   onText={(text) => update(w.line.catalogItemId, { text })}
+                  onFill={(end) => fill(w, end)}
                   onRemove={() => remove(w.line.catalogItemId)}
                   priceRef={(element) => {
                     if (element) priceFields.current.set(w.line.catalogItemId, element);
@@ -432,11 +441,12 @@ type LineProps = {
   onQuantity: (quantity: number) => void;
   onMode: (mode: Mode) => void;
   onText: (text: string) => void;
+  onFill: (end: "lowest" | "retail") => void;
   onRemove: () => void;
   priceRef: (element: HTMLInputElement | null) => void;
 };
 
-function LineEditor({ worked, onQuantity, onMode, onText, onRemove, priceRef }: LineProps) {
+function LineEditor({ worked, onQuantity, onMode, onText, onFill, onRemove, priceRef }: LineProps) {
   const id = useId();
   const { line, product, split, priceCents, problem, rangeMessage } = worked;
   const message = problem ?? rangeMessage;
@@ -499,6 +509,12 @@ function LineEditor({ worked, onQuantity, onMode, onText, onRemove, priceRef }: 
         <p id={`${id}-hint`} className={styles.hint}>
           {line.mode === "margin" && priceCents !== null && <span>Price {formatCents(priceCents)}</span>}
           {split && <span className={styles.earn}>You earn {formatCents(split.marginCents)}</span>}
+          {split && (
+            <span className={styles.amounts}>
+              <span>Cost {formatCents(split.costCents)}</span>
+              <span>Fee {formatCents(split.feeCents)}</span>
+            </span>
+          )}
           {split && priceCents !== null && (
             <span>
               {priceCents > product.msrpCents
@@ -512,6 +528,14 @@ function LineEditor({ worked, onQuantity, onMode, onText, onRemove, priceRef }: 
             {message}
           </p>
         )}
+        <div className={styles.fills}>
+          <Button className="button" onPress={() => onFill("lowest")}>
+            No profit
+          </Button>
+          <Button className="button" onPress={() => onFill("retail")}>
+            Max profit
+          </Button>
+        </div>
       </div>
 
       <Button className="button" aria-label={`Remove ${product.name}`} onPress={onRemove}>

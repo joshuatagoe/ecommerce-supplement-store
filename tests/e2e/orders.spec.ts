@@ -104,6 +104,32 @@ test("typing a margin finds the lowest price that earns it (D5)", async ({ page 
   await expectSaved(page);
 });
 
+test("No profit and Max profit set a line's price or margin, with the fee shown", async ({ page }) => {
+  const magnesium = await draftWithMagnesium(page);
+  await expect(magnesium.getByText("Cost $20.00")).toBeVisible();
+  await expect(magnesium.getByText("Fee $0.27")).toBeVisible();
+
+  await magnesium.getByRole("button", { name: "No profit" }).click();
+  await expect(magnesium.getByLabel("Price per bottle")).toHaveValue("20.16");
+  await expect(magnesium.getByText("You earn $0.00")).toBeVisible();
+  await magnesium.getByRole("button", { name: "Max profit" }).click();
+  await expect(magnesium.getByLabel("Price per bottle")).toHaveValue("40.00");
+  await expect(magnesium.getByText("You earn $19.70")).toBeVisible();
+  await expect(magnesium.getByText("Fee $0.30")).toBeVisible();
+  // Retail is allowed, so nothing blocks Send.
+  await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
+
+  // In margin mode the buttons set the margin those prices earn.
+  await magnesium.getByText("Margin", { exact: true }).click();
+  await magnesium.getByRole("button", { name: "No profit" }).click();
+  await expect(magnesium.getByLabel("Margin per bottle")).toHaveValue("0.00");
+  await expect(magnesium.getByText("Price $20.16")).toBeVisible();
+  await magnesium.getByRole("button", { name: "Max profit" }).click();
+  await expect(magnesium.getByLabel("Margin per bottle")).toHaveValue("19.70");
+  await expect(magnesium.getByText("Price $40.00")).toBeVisible();
+  await expectSaved(page);
+});
+
 test("New link replaces the link, after asking", async ({ page }) => {
   await draftWithMagnesium(page);
   await expectSaved(page);

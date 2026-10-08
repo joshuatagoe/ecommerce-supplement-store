@@ -23,6 +23,6 @@ test("the health check reports a migrated database", async ({ request }) => {
     migrations: "current",
     applied: 4,
     latest: "0003_money_core_gaps",
-    milestone: expect.stringMatching(/^(S1|M\d)$/),
+    milestone: expect.stringMatching(/^(S1|M\d|L\d)$/),
   });
 });
