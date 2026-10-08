@@ -257,3 +257,9 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 ### Where AI misled us or we course-corrected
 
 50. **The AI's first plan for tagging log lines wouldn't have worked.** It meant to set the request ID once, inside the sign-in check every portal action calls, using Node's request-scoped storage. A five-line probe on Node 24 showed a value set inside a called function never reaches the function that called it, so every action's log lines would have had no ID. The ID now travels in the Orders and Payments contexts, like the clock and the link sender (D85).
+
+## 2026-10-08 — L4 (the recurring-orders design)
+
+### What worked
+
+- **Three research agents in parallel, one per side, at the user's request:** pharmacy refills (CVS, Express Scripts, Amazon Pharmacy), supplement subscriptions (Fullscript, Thorne, Amazon, Ritual), and what neither covers (the rules for recurring charges, payment retries, clinical review, adherence, shipping times). Each cited its sources and marked what it couldn't confirm. Comparing them showed the first draft's 7-day lead time and hard block on early orders were tighter than any pharmacy or supplement seller, and both changed (D86).
