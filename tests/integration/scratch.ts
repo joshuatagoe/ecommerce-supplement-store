@@ -24,6 +24,12 @@ export async function scratchDatabase(prefix: string): Promise<Scratch> {
   url.pathname = `/${name}`;
   await runMigrations(url.href);
   const pool = new pg.Pool({ connectionString: url.href, max: 20 });
+  // DROP DATABASE … WITH (FORCE) can end a connection the pool is still closing,
+  // and Postgres reports that (57P01) on the idle client. Any other error still
+  // fails the run.
+  pool.on("error", (error: Error & { code?: string }) => {
+    if (error.code !== "57P01") throw error;
+  });
   return {
     url: url.href,
     pool,
