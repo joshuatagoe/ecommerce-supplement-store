@@ -144,6 +144,21 @@ test("New order lists recent patients before any typing, and choosing one works 
   await expect(page.getByRole("heading", { name: "Recent orders" })).toBeVisible();
 });
 
+test("a draft's Add list has a search box, and says when nothing matches (L5)", async ({ page }) => {
+  await draftWithMagnesium(page);
+  const search = page.getByLabel("Search My store");
+  await search.fill("omega");
+  await expect(page.getByRole("button", { name: "Add Ultimate Omega to this order" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Add .+ to this order$/ })).toHaveCount(1);
+
+  await search.fill("no such product");
+  await expect(page.getByText("No items in My store match “no such product”.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(search).toHaveValue("");
+  await page.getByRole("button", { name: "Add Ultimate Omega to this order" }).click();
+  await expect(line(page, "Ultimate Omega")).toBeVisible();
+});
+
 test("New link replaces the link, after asking", async ({ page }) => {
   await draftWithMagnesium(page);
   await expectSaved(page);

@@ -7,6 +7,7 @@ import { type FormEvent, useEffect, useId, useRef, useState, useTransition } fro
 import type { CatalogItem, StoreItem } from "@/server/store";
 import { centsToField, formatCents, parseDollars } from "@/shared/money";
 import { unitSplit } from "@/shared/pricing";
+import { matchesProduct } from "@/shared/product-search";
 import { ProductImage } from "@/ui/components/ProductImage";
 import { removeStoreItemAction, saveStoreItemAction } from "./actions";
 import styles from "./store.module.css";
@@ -18,8 +19,16 @@ export function StoreEditor({ catalog, items, feeRateBps }: Props) {
   const [message, setMessage] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, startAdding] = useTransition();
+  const [search, setSearch] = useState("");
   const itemsHeading = useRef<HTMLHeadingElement>(null);
+  const searchField = useRef<HTMLInputElement>(null);
   const inStore = new Set(items.map((item) => item.id));
+  const shown = catalog.filter((product) => matchesProduct(product, search));
+
+  function clearSearch() {
+    setSearch("");
+    searchField.current?.focus();
+  }
 
   // Added items start at the no-profit price (the user's call, 2026-10-07 grill).
   function add(product: CatalogItem) {
@@ -84,59 +93,82 @@ export function StoreEditor({ catalog, items, feeRateBps }: Props) {
             {addError}
           </p>
         )}
-        <div className={styles.tableWrap} role="region" aria-labelledby="catalog" tabIndex={0}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th scope="col">Product</th>
-                <th scope="col" className={styles.num}>
-                  Our cost
-                </th>
-                <th scope="col" className={styles.num}>
-                  Lowest price
-                </th>
-                <th scope="col" className={styles.num}>
-                  Retail price
-                </th>
-                <th scope="col">
-                  <span className="visually-hidden">My store</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {catalog.map((product) => (
-                <tr key={product.id}>
-                  <th scope="row">
-                    <span className={styles.product}>
-                      <ProductImage src={product.imagePath} alt="" size={40} />
-                      <span>
-                        <span className={styles.brand}>{product.brand}</span> {product.name}
-                        <span className={styles.size}>{product.sizeLabel}</span>
-                      </span>
-                    </span>
-                  </th>
-                  <td className={styles.num}>{formatCents(product.costCents)}</td>
-                  <td className={styles.num}>{formatCents(product.lowestPriceCents)}</td>
-                  <td className={styles.num}>{formatCents(product.msrpCents)}</td>
-                  <td>
-                    {inStore.has(product.id) ? (
-                      <span className={styles.added}>In My store</span>
-                    ) : (
-                      <button
-                        className="button"
-                        aria-label={`Add ${product.name} to My store`}
-                        disabled={adding}
-                        onClick={() => add(product)}
-                      >
-                        Add
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className={styles.search}>
+          <label htmlFor="catalog-search">Search the catalog</label>
+          <input
+            ref={searchField}
+            id="catalog-search"
+            type="search"
+            autoComplete="off"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
         </div>
+        <p className="visually-hidden" role="status">
+          {search.trim() ? `${shown.length} ${shown.length === 1 ? "product" : "products"}` : ""}
+        </p>
+        {shown.length === 0 ? (
+          <p className={styles.empty}>
+            No products match “{search.trim()}”.{" "}
+            <button type="button" className="button" onClick={clearSearch}>
+              Clear search
+            </button>
+          </p>
+        ) : (
+          <div className={styles.tableWrap} role="region" aria-labelledby="catalog" tabIndex={0}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Product</th>
+                  <th scope="col" className={styles.num}>
+                    Our cost
+                  </th>
+                  <th scope="col" className={styles.num}>
+                    Lowest price
+                  </th>
+                  <th scope="col" className={styles.num}>
+                    Retail price
+                  </th>
+                  <th scope="col">
+                    <span className="visually-hidden">My store</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((product) => (
+                  <tr key={product.id}>
+                    <th scope="row">
+                      <span className={styles.product}>
+                        <ProductImage src={product.imagePath} alt="" size={40} />
+                        <span>
+                          <span className={styles.brand}>{product.brand}</span> {product.name}
+                          <span className={styles.size}>{product.sizeLabel}</span>
+                        </span>
+                      </span>
+                    </th>
+                    <td className={styles.num}>{formatCents(product.costCents)}</td>
+                    <td className={styles.num}>{formatCents(product.lowestPriceCents)}</td>
+                    <td className={styles.num}>{formatCents(product.msrpCents)}</td>
+                    <td>
+                      {inStore.has(product.id) ? (
+                        <span className={styles.added}>In My store</span>
+                      ) : (
+                        <button
+                          className="button"
+                          aria-label={`Add ${product.name} to My store`}
+                          disabled={adding}
+                          onClick={() => add(product)}
+                        >
+                          Add
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </>
   );

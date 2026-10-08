@@ -5,31 +5,31 @@
   font-size: 0.875rem;
 }
 
-.headline {
-  margin-top: var(--space-4);
+.summary {
+  margin-top: var(--space-5);
   padding: var(--space-4);
   border: 2px solid var(--text);
   border-radius: var(--radius);
 }
 
-.headline h2 {
+.summary h2 {
   font-size: 1.125rem;
   margin-bottom: var(--space-3);
 }
 
-.headline dl {
+.summary dl {
   margin: 0 0 var(--space-2);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3) var(--space-6);
 }
 
-.headline dt {
+.summary dt {
   color: var(--text-muted);
   font-size: 0.9375rem;
 }
 
-.headline dd {
+.summary dd {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
@@ -167,9 +167,88 @@
   min-width: 200px;
 }
 
-.footer {
+/* Shortcuts (L5): one click sets ordinary filters; the one that is on is marked. */
+.shortcuts ul {
+  list-style: none;
   margin: var(--space-3) 0 0;
-  padding: var(--space-3) var(--space-4);
-  border-top: 2px solid var(--text);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.shortcuts a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0 var(--space-3);
+  border: 2px solid var(--primary);
+  border-radius: 999px;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.shortcuts a:hover {
+  text-decoration: underline;
+}
+
+.shortcuts a[aria-current="true"] {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* Contrast themes drop the fill, so the system highlight marks the shortcut that is on. */
+@media (forced-colors: active) {
+  .shortcuts a[aria-current="true"] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+/* The summary names the view it adds up. */
+.view {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
+  font-weight: 600;
+}
+
+.productHeading {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.pager {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pager p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.pager ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--target);
+  min-height: var(--target);
+  border: 2px solid var(--text);
+  border-radius: var(--radius);
   font-weight: 700;
 }

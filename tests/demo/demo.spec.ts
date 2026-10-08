@@ -101,14 +101,17 @@ test("the main flow: My store, New order, Pay, where the money went, Sales", asy
   await page.getByRole("heading", { name: "Audit trail" }).scrollIntoViewIfNeeded();
   await beat(page, 3000);
 
-  // Sales (F4): this month's totals, the order, and the paid orders in view.
+  // Sales (F4): a shortcut sets the filters, and the summary at the top adds up that view (D80);
+  // a product filter shows what has been sold of one product (D82).
   await page.getByRole("link", { name: "Sales" }).click();
   await expect(page.getByRole("heading", { name: "Sales", level: 1 })).toBeVisible();
   await beat(page, 3000);
-  await page.getByLabel("Status").selectOption("paid");
+  await page.getByRole("navigation", { name: "Shortcuts" }).getByRole("link", { name: "Paid this month" }).click();
+  await expect(page.getByTestId("summary-view")).toHaveText("Paid this month");
+  await beat(page, 3000);
+  await page.getByLabel("Product").selectOption({ label: "Magnesium Glycinate" });
   await page.getByRole("button", { name: "Apply filters" }).click();
-  await expect(page.getByTestId("footer-totals")).toContainText("Paid orders in this view");
-  await page.getByTestId("footer-totals").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("summary-bottles")).toBeVisible();
   await beat(page, 3000);
 });
 

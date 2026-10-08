@@ -484,3 +484,23 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* Search over the list this page holds (L5). */
+.addSearch {
+  margin: 0 0 var(--space-3);
+}
+
+.addSearch label {
+  display: block;
+  font-weight: 600;
+}
+
+.addSearch input {
+  width: 100%;
+  max-width: 420px;
+  min-height: var(--target);
+  margin-top: var(--space-1);
+  padding: 0 var(--space-3);
+  border: 2px solid var(--input-border);
+  border-radius: var(--radius);
+}

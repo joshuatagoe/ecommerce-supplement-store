@@ -160,13 +160,14 @@ Privacy:
 ### F4 — Provider checks Sales
 
 1. Open **Sales**. See every order created, with patient, date, status in words (Draft, Sent, Needs review, Paid, Expired, Cancelled), total, "You earned", and the action for that status: Continue, Copy link, New link, Order again, or Cancel order (D31).
-2. See this month's totals by paid date: sales, earnings, and fees. These ignore the filters.
-3. Search by patient name or order reference. Filter by status, or by a date range on the created, sent, or paid date. A row under the list adds up the paid orders shown.
+2. At the top, a summary of the view: orders, paid orders, sales, earnings and fees for everything the filters and search select (D80).
+3. Pick a shortcut (Paid this month, Paid last month, Last 90 days, Waiting for payment, Drafts), or filter by status, a date range on the created, sent or paid date, or a product. Choosing a product lists the orders that include it, and the summary adds that product's bottles sold, sales and earnings (D82). Search by patient name or order reference. Orders come in numbered pages of 25 (D81).
 4. Open any order to see its details (F5).
 
 Edge cases:
 - **No orders yet.** An empty state that links to New order.
 - **Nothing matches the filters.** "No orders match. Clear filters."
+- **A page past the end.** The last page is shown.
 - **Other providers' orders.** Never shown.
 
 ### F5 — Audit a paid order
