@@ -173,7 +173,7 @@ flowchart TB
 | **Payments** | Payment attempts, Pay keys, and the sweep | Saves the attempt before charging. Asks Orders to mark an order paid, and never sets the status itself. |
 | **Reporting** | The Sales list, totals, Order details, and the reconciliation check | Read only |
 | **Pricing** | Fee, margin, lowest price, price from margin, and the range check | Pure functions on integer cents, with no reads or writes. The same module runs in the browser. |
-| **Ports** | `PaymentGateway`, `LinkSender`, `PatientDirectory` | The only way out to external services |
+| **Ports** | `PaymentGateway`, `LinkSender`, `PatientDirectory`, `Inventory` | The only way out to external services |
 
 The business modules live in `src/server/` and **never import Next.js.** Next.js routes and server actions only pass requests to them. That keeps them testable without a browser and leaves a clean seam if they ever move into their own service.
 
@@ -187,6 +187,7 @@ The PRD asks us to say what's stubbed.
 | **Login** | Pick a provider from a list. The result is a real signed JWT in an HttpOnly cookie. | The identity service vouches for the provider, and the same cookie carries it (D32) |
 | **Email and SMS** | Send is recorded as an audit event, and the provider copies the link | `LinkSender.send`. The subject line never contains product names. |
 | **EHR patient list** | Seeded patients for each practice | `PatientDirectory.search` |
+| **Inventory** | When an order is paid, each product and quantity is recorded on its audit trail ("Inventory updated: 2 × Magnesium Glycinate"). No stock is counted (D84). | `Inventory.recordSale`, called in the transaction that marks the order paid. A real version writes an outbox row there, and a worker sends it to the warehouse system, which owns the counts. |
 | **Payouts** | Earnings are worked out from paid orders | A payouts table and a job that transfers the margin |
 
 ## 4. Order lifecycle

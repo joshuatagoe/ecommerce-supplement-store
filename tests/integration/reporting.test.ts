@@ -7,6 +7,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { logInventory } from "@/server/adapters/log-inventory";
 import { logLinkSender } from "@/server/adapters/log-link-sender";
 import { stubPayments } from "@/server/adapters/stub-payments";
 import { cancelOrder, type OrdersContext, saveDraft, sendOrder, startOrder } from "@/server/orders";
@@ -50,7 +51,7 @@ async function order(
     if (options.paid) {
       const paidAt = new Date(options.paid);
       const result = await pay(
-        { db: scratch.db, now: () => paidAt, gateway, paymentTimeoutMs: 2_000, sweepAfterMs: 15_000, linkSigningKey: KEY },
+        { db: scratch.db, now: () => paidAt, gateway, paymentTimeoutMs: 2_000, sweepAfterMs: 15_000, linkSigningKey: KEY, inventory: logInventory },
         { token: sent.link.split("/pay/")[1], payKey: randomUUID(), card: { number: "4242424242424242", expiry: "12/30", securityCode: "123", zip: "94110" } },
       );
       if (!(result.ok && result.outcome === "paid")) throw new Error(`not paid: ${JSON.stringify(result)}`);
@@ -211,6 +212,8 @@ describe("orderAudit: Order details (F5)", () => {
       ["sent", "provider"],
       ["link_sent", "system"],
       ["paid", "patient"],
+      // Told what sold in the same step that marked it paid (D84).
+      ["inventory_updated", "system"],
     ]);
   });
 

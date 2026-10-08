@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { logInventory } from "@/server/adapters/log-inventory";
 import { logLinkSender } from "@/server/adapters/log-link-sender";
 import { stubPayments } from "@/server/adapters/stub-payments";
 import * as schema from "@/server/db/schema";
@@ -38,6 +39,7 @@ function payments(gateway: PaymentGateway, extra: Partial<PaymentsContext> = {})
     paymentTimeoutMs: 300,
     sweepAfterMs: 15_000,
     linkSigningKey: KEY,
+    inventory: logInventory,
     ...extra,
   };
 }
@@ -284,6 +286,76 @@ describe("three guards against a double charge (§5)", () => {
         expect(gateway.chargeCount()).toBe(1);
       }
     }
+  });
+});
+
+describe("inventory: what sold, told once per paid order (L6, PRD requirement 5)", () => {
+  async function inventoryUpdates(ref: string) {
+    const { rows } = await scratch.pool.query(
+      "SELECT e.details FROM order_events e JOIN orders o ON o.id = e.order_id WHERE o.ref = $1 AND e.kind = 'inventory_updated'",
+      [ref],
+    );
+    return rows.map((row) => row.details);
+  }
+
+  /** Two Magnesium and one Omega, sent. */
+  async function mixedOrder(clinic: TestClinic) {
+    const started = await startOrder(orders(), clinic.provider, { patientId: clinic.patientId });
+    if (!started.ok) throw new Error(started.error.message);
+    await saveDraft(orders(), clinic.provider, {
+      ref: started.ref,
+      lines: [
+        { catalogItemId: clinic.magnesiumId, quantity: 2, priceCents: 3600 },
+        { catalogItemId: clinic.omegaId, quantity: 1, priceCents: 2700 },
+      ],
+    });
+    const sent = await sendOrder(orders(), clinic.provider, started.ref);
+    if (!sent.ok) throw new Error(sent.error.message);
+    return { ref: started.ref, token: sent.link.split("/pay/")[1] };
+  }
+
+  it("tells inventory each product and quantity when Pay marks the order paid", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const { ref, token } = await mixedOrder(clinic);
+    expect(await pay(payments(stub()), { token, payKey: randomUUID(), card: card() })).toEqual({ ok: true, outcome: "paid" });
+    const [update, ...more] = await inventoryUpdates(ref);
+    expect(more).toEqual([]);
+    expect(update.items).toEqual([
+      { name: expect.stringMatching(/^Magnesium Glycinate/), quantity: 2 },
+      { name: expect.stringMatching(/^Ultimate Omega/), quantity: 1 },
+    ]);
+  });
+
+  it("tells inventory once when the sweep records the payment, however often the sweep runs (0101)", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const { ref, token } = await sentOrder(clinic);
+    const ctx = payments(stub({ silenceMs: 5_000 }), { paymentTimeoutMs: 150 });
+    await pay(ctx, { token, payKey: randomUUID(), card: card("4000000000000101") });
+    expect(await inventoryUpdates(ref)).toEqual([]);
+    await sweep(later(ctx));
+    await sweep(later(ctx));
+    expect((await order(ref)).status).toBe("paid");
+    expect(await inventoryUpdates(ref)).toHaveLength(1);
+  });
+
+  it("tells inventory once when Pay and the sweep race to record the same charge", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const { ref, token } = await sentOrder(clinic);
+    const gateway = stub();
+    // The sweep records the approval first; Pay's own write then finds it done and changes nothing.
+    const racing = payments(gateway, { hooks: { beforeRecordSuccess: async () => void (await sweep(later(payments(gateway)))) } });
+    expect((await pay(racing, { token, payKey: randomUUID(), card: card() })).ok).toBe(true);
+    expect((await order(ref)).status).toBe("paid");
+    expect(gateway.chargeCount()).toBe(1);
+    expect(await inventoryUpdates(ref)).toHaveLength(1);
+  });
+
+  it("tells inventory nothing when the card is declined", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const { ref, token } = await sentOrder(clinic);
+    await pay(payments(stub()), { token, payKey: randomUUID(), card: card("4000000000000002") });
+    expect((await order(ref)).status).toBe("sent");
+    expect(await inventoryUpdates(ref)).toEqual([]);
   });
 });
 
