@@ -171,11 +171,12 @@ test("checkout says how long the link works (L7)", async ({ browser }) => {
   await client.connect();
   const { rows } = await client.query("SELECT link_expires_at FROM orders WHERE ref = $1", [ref]);
   await client.end();
-  const until = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Los_Angeles" }).format(
-    rows[0].link_expires_at,
+  // The last full day the link works: the day before it expires, which is at the time of day it was sent.
+  const through = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Los_Angeles" }).format(
+    new Date(new Date(rows[0].link_expires_at).getTime() - 86_400_000),
   );
   const page = await patientPage(browser, path);
-  await expect(page.getByText(`This link works until ${until}. After that you can ask for a new one.`)).toBeVisible();
+  await expect(page.getByText(`This link works through ${through}. After that you can ask for a new one.`)).toBeVisible();
   // Links last 90 days (D87).
   const days = (new Date(rows[0].link_expires_at).getTime() - Date.now()) / 86_400_000;
   expect(Math.round(days)).toBe(90);

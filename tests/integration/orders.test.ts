@@ -392,6 +392,24 @@ describe("requestNewLink: the patient asks for a fresh link (L7)", () => {
     // Nothing changed on the order that was refused while its link still worked.
     expect((await events(working.ref)).at(-1)).toBe("link_sent");
   });
+
+  it("waits while a payment is in progress", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const { ref, link } = await sentOrder(clinic, sentAt);
+    await pendingAttempt(ref);
+    expect(await requestNewLink(ctx(expiredAt), tokenOf(link))).toMatchObject({ ok: false, error: { code: "PAYMENT_IN_PROGRESS" } });
+    await scratch.pool.query("UPDATE orders SET status = 'needs_review' WHERE ref = $1", [ref]);
+    expect(await requestNewLink(ctx(expiredAt), tokenOf(link))).toMatchObject({ ok: false, error: { code: "PAYMENT_IN_PROGRESS" } });
+  });
+
+  it("sends one new link when the button is pressed twice at the same moment", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const { ref, link } = await sentOrder(clinic, sentAt);
+    const results = await Promise.all([requestNewLink(ctx(expiredAt), tokenOf(link)), requestNewLink(ctx(expiredAt), tokenOf(link))]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.filter((result) => !result.ok)).toEqual([expect.objectContaining({ error: expect.objectContaining({ code: "NOT_FOUND" }) })]);
+    expect((await events(ref)).filter((kind) => kind === "new_link_requested")).toHaveLength(1);
+  });
 });
 
 describe("request IDs in the log (§11, L3)", () => {

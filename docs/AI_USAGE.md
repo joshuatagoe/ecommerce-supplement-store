@@ -270,3 +270,9 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 - **A quick research agent on the legal side before changing how long links last.** It found no law setting a lifetime, that Stripe and Square both expire invoice links and let the customer reissue one, that an unpaid link creates no debt, and that the link is probably health information. That turned the user's "don't let orders end" into the design: orders never end, links last 90 days, and a new link is one click away (D87).
 - **Checking the seed against the new lifetime.** With 90-day links, the seed's expired example for Dr. Rivera was no longer old enough to have expired, so the demo would have lost its Expired order. The seed now picks one that's old enough for whatever the lifetime is.
+
+## 2026-10-08 — L8 (the link expiry wording, after a review)
+
+### Where AI misled us or we course-corrected
+
+51. **The AI's checkout line "This link works until Jan 6" was wrong for part of that day.** A link expires at the time of day it was sent, so a link sent at 3 PM stopped working at 3 PM on January 6, while the page promised the whole day. The user asked for a review of the L7 commit, and the review found it, along with two refusals the code handled but no test proved. The patient now sees the last full day ("works through Jan 5"), the provider sees the exact time, and both refusals have tests.

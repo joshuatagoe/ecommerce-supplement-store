@@ -140,7 +140,7 @@ export function OrderSummary({ order, audit, notice, timeZone }: Props) {
             {copied ? "Link copied" : ""}
           </p>
           <p className={styles.muted}>
-            The link works until {formatDate(order.linkExpiresAt!, timeZone)}. Email is stubbed in this demo, so copy the
+            The link works until {formatDateTime(order.linkExpiresAt!, timeZone)}. Email is stubbed in this demo, so copy the
             link and send it to {order.patient.name} yourself.
           </p>
         </div>
