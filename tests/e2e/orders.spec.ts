@@ -130,6 +130,20 @@ test("No profit and Max profit set a line's price or margin, with the fee shown"
   await expectSaved(page);
 });
 
+test("New order lists recent patients before any typing, and choosing one works like a search result", async ({ page }) => {
+  // A fresh draft for Sam makes him Dr. Rivera's most recent patient.
+  await draftWithMagnesium(page);
+  await page.getByRole("link", { name: "New order", exact: true }).click();
+  const recent = page.getByRole("list", { name: "Recent patients" });
+  await expect(recent.getByRole("button").first()).toHaveText("Sam Okafor");
+  expect(await recent.getByRole("button").count()).toBeLessThanOrEqual(10);
+
+  await recent.getByRole("button", { name: "Sam Okafor" }).click();
+  await expect(page.getByRole("heading", { name: "Sam Okafor", level: 2 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start order for Sam Okafor" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent orders" })).toBeVisible();
+});
+
 test("New link replaces the link, after asking", async ({ page }) => {
   await draftWithMagnesium(page);
   await expectSaved(page);

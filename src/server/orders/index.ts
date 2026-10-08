@@ -4,7 +4,7 @@
 // itself through NOTIFY. Every query is limited to the provider who owns the
 // order; another provider's order is NOT_FOUND, the same as a missing one.
 // The clock comes from the context, so the seed can build history (M6).
-import { and, asc, count, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, max, ne } from "drizzle-orm";
 import { priceRangeMessage } from "../../shared/money.ts";
 import {
   checkPrice,
@@ -23,6 +23,7 @@ import { catalogItems, orderEvents, orderLines, orders, patients, paymentAttempt
 import { payLink } from "../links/index.ts";
 import { logStatusChange } from "../log.ts";
 import type { LinkSender } from "../ports/link-sender.ts";
+import type { PatientMatch } from "../ports/patient-directory.ts";
 import { newRef } from "./refs.ts";
 
 export type OrdersContext = {
@@ -642,4 +643,20 @@ export async function recentOrders(ctx: OrdersContext, provider: ProviderRef, pa
     totalCents: row.totalCents,
     itemCount: row.itemCount,
   }));
+}
+
+/**
+ * The patients this provider last started orders for, newest first, each once (F2 step 1).
+ * New order lists them before any typing; search still covers the whole practice.
+ */
+export async function recentPatients(ctx: OrdersContext, provider: ProviderRef, limit = 10): Promise<PatientMatch[]> {
+  const rows = await ctx.db
+    .select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName })
+    .from(orders)
+    .innerJoin(patients, eq(patients.id, orders.patientId))
+    .where(eq(orders.providerId, provider.id))
+    .groupBy(patients.id)
+    .orderBy(desc(max(orders.createdAt)))
+    .limit(limit);
+  return rows.map((row) => ({ id: row.id, name: `${row.firstName} ${row.lastName}` }));
 }

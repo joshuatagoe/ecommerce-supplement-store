@@ -10,7 +10,9 @@ import { StatusBadge } from "@/ui/components/StatusBadge";
 import { type RecentOrderRow, recentOrdersAction, searchPatientsAction, startOrderAction } from "./actions";
 import styles from "./new-order.module.css";
 
-export function NewOrder({ timeZone }: { timeZone: string }) {
+type Props = { timeZone: string; recentPatients: PatientMatch[] };
+
+export function NewOrder({ timeZone, recentPatients }: Props) {
   const [text, setText] = useState("");
   const [matches, setMatches] = useState<{ text: string; patients: PatientMatch[] }>({ text: "", patients: [] });
   const [patient, setPatient] = useState<PatientMatch | null>(null);
@@ -37,8 +39,8 @@ export function NewOrder({ timeZone }: { timeZone: string }) {
   const shown = text.trim() ? matches.patients : [];
   const searching = text.trim() !== "" && matches.text !== text;
 
-  async function choose(id: string | null) {
-    const chosen = shown.find((match) => match.id === id) ?? null;
+  /** A search result or a recent patient: either way, their recent orders load below. */
+  async function choose(chosen: PatientMatch | null) {
     setPatient(chosen);
     setRecent(null);
     setError(null);
@@ -58,14 +60,14 @@ export function NewOrder({ timeZone }: { timeZone: string }) {
   return (
     <>
       <h1>New order</h1>
-      <p className={styles.intro}>Choose a patient. Their recent orders appear below, so you can repeat one.</p>
+      <p className={styles.intro}>Search for a patient or choose a recent one. Their recent orders appear below, so you can repeat one.</p>
 
       <ComboBox
         className={styles.combo}
         items={shown}
         inputValue={text}
         onInputChange={setText}
-        onSelectionChange={(key) => choose(key === null ? null : String(key))}
+        onSelectionChange={(key) => choose(shown.find((match) => match.id === key) ?? null)}
         defaultFilter={() => true}
         menuTrigger="input"
         allowsEmptyCollection
@@ -85,6 +87,24 @@ export function NewOrder({ timeZone }: { timeZone: string }) {
           </ListBox>
         </Popover>
       </ComboBox>
+
+      {/* Nothing to show for a provider with no orders yet: the search is enough. */}
+      {recentPatients.length > 0 && (
+        <div className={styles.recentPatients}>
+          <h2 id="recent-patients" className={styles.recentPatientsHeading}>
+            Recent patients
+          </h2>
+          <ul className={styles.patientList} aria-labelledby="recent-patients">
+            {recentPatients.map((match) => (
+              <li key={match.id}>
+                <Button className="button" isDisabled={pending} onPress={() => choose(match)}>
+                  {match.name}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {error && (
         <p className={styles.error} role="alert">

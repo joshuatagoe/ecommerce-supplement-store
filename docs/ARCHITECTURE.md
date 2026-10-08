@@ -593,7 +593,7 @@ flowchart TB
 | Page | Shows | Actions |
 |---|---|---|
 | **Sales** (home) | Headline totals, then the order list with search, filters, and a footer row | The action for each status |
-| **New order** | Patient picker. Once a patient is chosen, that patient's recent orders with Order again, and Start order. Choosing a patient creates nothing; Start order or Order again creates the draft, which opens at `orders/[ref]` (D56). Then lines with quantity, price or margin, "You earn" with the cost and fee it comes after, No profit and Max profit, saving against retail, and totals. | Send, then "Sent to Sam" with Copy link |
+| **New order** | Patient picker, with Recent patients under it before any typing (D79). Once a patient is chosen, that patient's recent orders with Order again, and Start order. Choosing a patient creates nothing; Start order or Order again creates the draft, which opens at `orders/[ref]` (D56). Then lines with quantity, price or margin, "You earn" with the cost and fee it comes after, No profit and Max profit, saving against retail, and totals. | Send, then "Sent to Sam" with Copy link |
 | **Order details** | Each line's price, cost, fee and margin; totals; fee rate; times; the audit trail | Copy link, New link, Order again, Cancel order |
 | **My store** | The catalog with cost, lowest price and retail price, plus the provider's items with usual prices | Add, remove, set the usual price, No profit, Max profit |
 | **Pay page** | The six states ([§6](#6-pay-links)) | Pay |
