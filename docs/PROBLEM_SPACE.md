@@ -16,7 +16,7 @@ We bring this in-house. A provider recommends supplements to a patient inside ou
 2. The patient pays. The payment step is stubbed.
 3. The system computes and stores the split: item cost (COGS), provider margin, and the 75 bps fee.
 4. The split is correct and auditable. A paid order shows where every cent went.
-5. A provider dashboard shows what has been sold and lets the provider update which items they sell. There is no stock tracking.
+5. A provider dashboard shows what has been sold and lets the provider update which items they sell. There is no stock tracking. When an order is paid, we tell our inventory what sold, through a stub (D84): "update inventory" can also mean that, a reading we came to after the build.
 
 ### Out of scope (PRD)
 

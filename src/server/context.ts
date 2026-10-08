@@ -1,6 +1,7 @@
 // The Orders context for a live request or a script: the real database, the
 // real clock, settings from the environment, and the email stub. Tests and the
 // seed build their own, with a clock of their choosing.
+import { logInventory } from "./adapters/log-inventory.ts";
 import { logLinkSender } from "./adapters/log-link-sender.ts";
 import { stubPayments } from "./adapters/stub-payments/index.ts";
 import {
@@ -52,5 +53,6 @@ export function paymentsContext(): PaymentsContext {
     paymentTimeoutMs: paymentTimeoutMs(),
     sweepAfterMs: sweepAfterMs(),
     linkSigningKey: linkSigningKey(),
+    inventory: logInventory,
   };
 }

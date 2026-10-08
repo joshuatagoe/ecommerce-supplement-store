@@ -43,6 +43,11 @@ function describe(event: AuditEvent, order: OrderView): string {
       return "Needs review: the payment company didn't give a clear answer";
     case "paid":
       return details.settledBy === "sweep" ? "Paid, confirmed by the payment check" : "Paid by the patient";
+    case "inventory_updated": {
+      const items = (details.items as { name: string; quantity: number }[] | undefined) ?? [];
+      const sold = items.map((item) => `${item.quantity} × ${item.name}`).join(", ");
+      return `Inventory updated: ${sold} (inventory is stubbed in this demo)`;
+    }
     case "payment_not_charged":
       return "A payment didn't go through; the patient wasn't charged";
     case "cancelled":

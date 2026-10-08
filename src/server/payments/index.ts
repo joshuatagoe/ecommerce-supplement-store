@@ -12,15 +12,18 @@ import { type PayPageState, payPageState } from "../../shared/status.ts";
 import type { ActionResult } from "../../shared/schemas.ts";
 import type { Db, Tx } from "../db/client.ts";
 import { notifyStatusChange } from "../db/notify.ts";
-import { orderEvents, orderLines, orders, paymentAttempts, practices, providers } from "../db/schema.ts";
+import { catalogItems, orderEvents, orderLines, orders, paymentAttempts, practices, providers } from "../db/schema.ts";
 import { orderForToken } from "../links/index.ts";
 import { logStatusChange } from "../log.ts";
+import type { Inventory } from "../ports/inventory.ts";
 import type { Card, PaymentGateway } from "../ports/payment-gateway.ts";
 
 export type PaymentsContext = {
   db: Db;
   now: () => Date;
   gateway: PaymentGateway;
+  /** Told what sold, in the same transaction that marks an order paid (D84). */
+  inventory: Inventory;
   /** How long Pay waits for the payment company (PAYMENT_TIMEOUT_MS). */
   paymentTimeoutMs: number;
   /** How long an attempt may stay pending before the sweep asks about it (SWEEP_AFTER_MS). */
@@ -197,6 +200,14 @@ async function recordSuccess(
         at: now,
         details: { attemptId: attempt.attemptId, settledBy },
       });
+      // Only the write that actually marked the order paid gets here, so inventory hears once (D84).
+      const sold = await tx
+        .select({ catalogItemId: orderLines.catalogItemId, name: catalogItems.name, quantity: orderLines.quantity })
+        .from(orderLines)
+        .innerJoin(catalogItems, eq(catalogItems.id, orderLines.catalogItemId))
+        .where(eq(orderLines.orderId, attempt.orderId))
+        .orderBy(asc(catalogItems.name));
+      await ctx.inventory.recordSale(tx, { orderId: attempt.orderId, ref: attempt.ref, lines: sold, at: now });
       await notifyStatusChange(tx, attempt.ref);
       return before.status;
     })

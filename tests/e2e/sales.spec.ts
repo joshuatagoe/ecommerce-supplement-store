@@ -232,6 +232,8 @@ test("Order details shows where every cent of a paid order went, and its audit t
   await expect(trail.getByText("Draft started by Dr. Rivera")).toBeVisible();
   await expect(trail.getByText("Sent by Dr. Rivera")).toBeVisible();
   await expect(trail.getByText("Paid by the patient")).toBeVisible();
+  // PRD requirement 5's other reading: our stock hears what sold (D84).
+  await expect(trail.getByText("Inventory updated: 1 × Magnesium Glycinate (inventory is stubbed in this demo)")).toBeVisible();
   await expectNoAxeViolations(page);
 });
 

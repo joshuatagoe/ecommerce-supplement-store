@@ -175,6 +175,7 @@ Edge cases:
 1. Open **Order details** for a paid order.
 2. Per item: the price, our cost, the 0.75% fee, and the provider's margin. The three parts add up to the price.
 3. Order totals, the fee rate used, the created, sent, and paid times, and the payment reference.
+4. The audit trail, ending with what the paid order told our inventory: "Inventory updated: 1 × Magnesium Glycinate" (D84).
 
 **Who sees it.** The provider, for their own orders. Internally, the same view plus the totals check across all paid orders.
 

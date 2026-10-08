@@ -9,6 +9,7 @@
 // and one draft. "Needs review" isn't seeded: the sweep settles it in seconds,
 // and the 0101 test card shows it live.
 import { randomUUID } from "node:crypto";
+import { logInventory } from "../adapters/log-inventory.ts";
 import { logLinkSender } from "../adapters/log-link-sender.ts";
 import type { Db } from "../db/client.ts";
 import { cancelOrder, type OrdersContext, saveDraft, sendOrder, startOrder } from "../orders/index.ts";
@@ -121,7 +122,7 @@ export async function seedHistory(db: Db, providers: HistoryProvider[], settings
         const latest = Math.min(now.getTime() - HOUR, sentAt.getTime() + 3 * DAY);
         const paidAt = new Date(random.between(sentAt.getTime() + HOUR, Math.max(sentAt.getTime() + HOUR, latest)));
         const result = await pay(
-          { db, now: () => paidAt, gateway: historyGateway, paymentTimeoutMs: 5_000, sweepAfterMs: 15_000, linkSigningKey: settings.linkSigningKey },
+          { db, now: () => paidAt, gateway: historyGateway, paymentTimeoutMs: 5_000, sweepAfterMs: 15_000, linkSigningKey: settings.linkSigningKey, inventory: logInventory },
           {
             token: sent.link.split("/pay/")[1],
             payKey: randomUUID(),
