@@ -217,3 +217,12 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 - **Seeding history through the app's own code, with a fixed random seed.** The seed's 33 paid orders pass reconciliation, Dr. Patel's lines all earn exactly $0.00, and rebuilding gives the same history every time. A test checks each of those.
 - **Checking the polish under a contrast theme.** Screenshots with forced colours on showed the pay page's tints disappearing as expected, with every pill, mark and control keeping its border. Two browser tests now emulate a contrast theme and run axe.
+
+## 2026-10-07 — M8 (load tests and the outage drill)
+
+### What worked
+
+- **Driving the real app instead of adding test endpoints.** A short probe showed how Next.js 16 calls a server action (a POST with a `Next-Action` header) and how a form posts without JavaScript. That was enough for k6 to run every order through the same code a browser does.
+- **Checking the money, not just the speed, after every run.** Even at Level 3, where a quarter of requests failed, reconciliation was clean and every charge was a recorded payment. A speed-only test couldn't have shown that.
+- **Reading the server's log during a passing run.** Level 1 passed every threshold, but one "Connection terminated unexpectedly" in the log led to the missing pool error handler (D72), which the outage drill then proved.
+- **Measuring before naming a bottleneck.** Per-step timings and CPU samples during Level 2 showed the app server at its one-core ceiling and Postgres at 40%. Without them, the pool or the stub's file would have been plausible guesses.
