@@ -60,7 +60,7 @@ const historyGateway: PaymentGateway = {
 type Plan = { createdAt: Date; outcome: "paid" | "cancelled" | "expired" | "sent" | "draft" };
 
 /** About five orders a month for four months, at clinic hours, ending a day ago. */
-function plan(random: ReturnType<typeof generator>, now: Date): Plan[] {
+function plan(random: ReturnType<typeof generator>, now: Date, linkTtlDays: number): Plan[] {
   const start = now.getTime() - 120 * DAY;
   const plans: Plan[] = [];
   for (let i = 0; i < 20; i++) {
@@ -75,7 +75,11 @@ function plan(random: ReturnType<typeof generator>, now: Date): Plan[] {
   }
   plans.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   // Every lasting status shows up: one link left to expire, one open link, one draft.
-  plans[2].outcome = "expired";
+  // The expired one must be older than a link lasts (D87), whatever LINK_TTL_DAYS says.
+  const oldEnough = (p: Plan) => now.getTime() - p.createdAt.getTime() > (linkTtlDays + 2) * DAY;
+  const expired = oldEnough(plans[2]) ? plans[2] : plans.findLast(oldEnough);
+  if (expired) expired.outcome = "expired";
+  else plans.push({ createdAt: new Date(now.getTime() - (linkTtlDays + 5) * DAY), outcome: "expired" });
   plans.push({ createdAt: new Date(now.getTime() - 4 * DAY - 3 * HOUR), outcome: "sent" });
   plans.push({ createdAt: new Date(now.getTime() - 1 * DAY - 2 * HOUR), outcome: "draft" });
   plans.push({ createdAt: new Date(now.getTime() - 40 * DAY), outcome: "cancelled" });
@@ -90,7 +94,7 @@ export async function seedHistory(db: Db, providers: HistoryProvider[], settings
     const at = (time: Date): OrdersContext => ({ db, now: () => time, linkSender: logLinkSender, ...settings });
     const who = { id: provider.id, practiceId: provider.practiceId };
 
-    for (const { createdAt, outcome } of plan(random, now)) {
+    for (const { createdAt, outcome } of plan(random, now, settings.linkTtlDays)) {
       const patientId = random.pick(provider.patientIds);
       // About a quarter repeat the patient's last paid order (D31).
       const repeatOf = paidBy.get(patientId);

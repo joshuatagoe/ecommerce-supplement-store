@@ -35,7 +35,7 @@ export function appUrl(): string {
 
 /** How long a pay link can start a payment (§6). */
 export function linkTtlDays(): number {
-  return whole("LINK_TTL_DAYS", 30);
+  return whole("LINK_TTL_DAYS", 90);
 }
 
 /** The pause after typing before a draft saves itself (§9). */

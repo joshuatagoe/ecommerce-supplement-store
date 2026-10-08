@@ -257,7 +257,7 @@ export function SalesList({ filters, filtered, initial, timeZone, view, productN
                                   keepLabel="Keep this link"
                                   onConfirm={() => run(newLinkAction, row.ref)}
                                 >
-                                  <p>The current link for {row.ref} stops working, and the new one works for 30 days.</p>
+                                  <p>The current link for {row.ref} stops working, and the new one works for 90 days.</p>
                                 </ConfirmDialog>
                               );
                             case "cancel_order":

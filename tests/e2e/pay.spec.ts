@@ -165,13 +165,37 @@ test("a cancelled order is no longer available", async ({ browser }) => {
   await expectNoAxeViolations(page);
 });
 
-test("an expired link says so", async ({ browser }) => {
+test("checkout says how long the link works (L7)", async ({ browser }) => {
+  const { path, ref } = await sentLink(browser);
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  const { rows } = await client.query("SELECT link_expires_at FROM orders WHERE ref = $1", [ref]);
+  await client.end();
+  const until = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Los_Angeles" }).format(
+    rows[0].link_expires_at,
+  );
+  const page = await patientPage(browser, path);
+  await expect(page.getByText(`This link works until ${until}. After that you can ask for a new one.`)).toBeVisible();
+  // Links last 90 days (D87).
+  const days = (new Date(rows[0].link_expires_at).getTime() - Date.now()) / 86_400_000;
+  expect(Math.round(days)).toBe(90);
+});
+
+test("an expired link says so, and Send me a new link sends a fresh one to the email on file (L7)", async ({ browser }) => {
   const { path, ref } = await sentLink(browser);
   await sql("UPDATE orders SET link_expires_at = now() - interval '1 day' WHERE ref = $1", [ref]);
   const page = await patientPage(browser, path);
   await expect(page.getByRole("heading", { name: "This link has expired" })).toBeVisible();
-  await expect(page.getByText("Contact Dr. Rivera's clinic for a new one.")).toBeVisible();
+  await expect(page.getByText("You can ask for a new one. We'll send it to the email address Lakeview Family Practice has for you.")).toBeVisible();
   await expectNoAxeViolations(page);
+
+  await page.getByRole("button", { name: "Send me a new link" }).click();
+  // A page of its own, with no link and no order details for whoever holds the old link.
+  await expect(page).toHaveURL(/\/pay\/link-sent$/);
+  await expect(page.getByRole("heading", { name: "We've sent you a new link" })).toBeVisible();
+  await expectNoAxeViolations(page);
+  // The old link is now turned off.
+  expect((await page.goto(path))?.status()).toBe(404);
 });
 
 test("a replaced or made-up link isn't valid, and reveals nothing (404)", async ({ browser, request }) => {

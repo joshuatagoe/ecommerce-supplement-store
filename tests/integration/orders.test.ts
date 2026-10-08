@@ -13,6 +13,7 @@ import {
   type OrdersContext,
   recentOrders,
   recentPatients,
+  requestNewLink,
   saveDraft,
   sendOrder,
   startOrder,
@@ -346,6 +347,50 @@ describe("newLink", () => {
     expect(await newLink(ctx(), clinic.provider, ref)).toMatchObject({ ok: false, error: { code: "PAYMENT_IN_PROGRESS" } });
     const draft = await draftFor(clinic);
     expect(await newLink(ctx(), clinic.provider, draft)).toMatchObject({ ok: false, error: { code: "ORDER_NOT_SENT" } });
+  });
+});
+
+describe("requestNewLink: the patient asks for a fresh link (L7)", () => {
+  const sentAt = new Date("2026-06-01T17:00:00Z");
+  const expiredAt = new Date(sentAt.getTime() + 31 * DAY);
+  const tokenOf = (link: string) => link.split("/pay/")[1];
+
+  it("sends a fresh link to the email on file, turns the old one off, and keeps the order and its price", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const { ref, link } = await sentOrder(clinic, sentAt);
+    const before = await row("SELECT total_cents, link_version FROM orders WHERE ref = $1", [ref]);
+
+    expect(await requestNewLink(ctx(expiredAt), tokenOf(link))).toEqual({ ok: true });
+
+    const after = await row("SELECT total_cents, link_version, link_expires_at FROM orders WHERE ref = $1", [ref]);
+    expect(after.total_cents).toBe(before.total_cents);
+    expect(after.link_version).toBe(Number(before.link_version) + 1);
+    expect(new Date(after.link_expires_at as string).getTime()).toBe(expiredAt.getTime() + 30 * DAY);
+    // Whoever holds the old link can't use it; the new one went to the email on file.
+    expect(await orderForToken(scratch.db, KEY, tokenOf(link))).toBeNull();
+    expect(await orderForToken(scratch.db, KEY, linkToken(KEY, ref, Number(after.link_version)))).toMatchObject({ ref });
+    expect((await events(ref)).slice(-2)).toEqual(["new_link_requested", "link_sent"]);
+  });
+
+  it("refuses while the link still works, for a cancelled order, and for a replaced or made-up link", async () => {
+    const clinic = await makeClinic(scratch.pool);
+    const working = await sentOrder(clinic, sentAt);
+    expect(await requestNewLink(ctx(new Date(sentAt.getTime() + DAY)), tokenOf(working.link))).toMatchObject({
+      ok: false,
+      error: { code: "LINK_STILL_WORKS" },
+    });
+
+    const cancelled = await sentOrder(clinic, sentAt);
+    await cancelOrder(ctx(sentAt), clinic.provider, cancelled.ref);
+    expect(await requestNewLink(ctx(expiredAt), tokenOf(cancelled.link))).toMatchObject({ ok: false, error: { code: "ORDER_FINAL" } });
+
+    const replaced = await sentOrder(clinic, sentAt);
+    await newLink(ctx(sentAt), clinic.provider, replaced.ref);
+    expect(await requestNewLink(ctx(expiredAt), tokenOf(replaced.link))).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+
+    expect(await requestNewLink(ctx(expiredAt), "AAAA-AAAA.AAAAAAAAAAAAAAAAAAAAAA")).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+    // Nothing changed on the order that was refused while its link still worked.
+    expect((await events(working.ref)).at(-1)).toBe("link_sent");
   });
 });
 

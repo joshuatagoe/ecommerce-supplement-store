@@ -125,7 +125,7 @@ Things that can go wrong:
 1. Open **New order** and choose a patient (from the EHR; seeded in the slice): search by name, or pick one of **Recent patients**, the last ten this provider started orders for (D79). Patients are registered in the EHR, so there's no Add patient here. That patient's recent orders appear with **Order again**, which starts a new draft with the same items, quantities and prices (D31).
 2. Pick items from My store and a quantity of 1–10 for each (D28). Each starts at the usual price (D10).
 3. Change a price or margin for this patient if needed (D5). Each line shows the price, "You earn" with the cost and fee it comes after, and the saving vs retail. **No profit** and **Max profit** set the line to the lowest price or to retail; in margin mode they set the margin those prices earn (D78). The order shows a total and the provider's total earnings. The draft saves itself (D26).
-4. Review, then **Send**. The order locks. We create a signed link that works for 30 days (D25).
+4. Review, then **Send**. The order locks. We create a signed link that works for 90 days (D25, D87).
 5. The link is "sent" to the patient. Email is stubbed, so the provider can also **Copy link**, from the confirmation or later from Sales.
 
 Things that can go wrong:
@@ -133,7 +133,7 @@ Things that can go wrong:
 - **Double-clicking Send.** One order and one link. Both clicks return the same link.
 - **Pulled away mid-order.** The draft has saved itself. Continue it from Sales.
 - **Mistake after sending.** A sent order can't be edited. The provider can **Cancel order** while no payment is in progress, then use **Order again** to rebuild it with the fix.
-- **Link lost or forwarded to the wrong person.** **New link** turns the old link off and starts a fresh 30 days.
+- **Link lost or forwarded to the wrong person.** **New link** turns the old link off and starts a fresh 90 days.
 - **Catalog or store price changes after sending.** The sent order keeps its prices.
 
 ### F3 — Patient pays
@@ -150,7 +150,7 @@ Things that can go wrong:
 - **The page can't load** (for example, our database is down). "We couldn't load this page. If you just paid, don't pay again: your payment may still be going through. Reload this page in a moment." It never says "declined" (D73).
 - **Link reopened after payment.** "Already paid", with the receipt.
 - **Cancelled order.** "This order is no longer available. Contact [the practice] if you still need these items."
-- **Link older than 30 days.** "This link has expired. Contact Dr. [name]'s clinic for a new one."
+- **Link older than 90 days.** "This link has expired", with **Send me a new link**, which emails a fresh link to the address on file and keeps the same order and price (D87). The checkout page says when the link stops working.
 - **Replaced, broken or made-up link.** "This link isn't valid. If your provider sent you a newer link, use that one. Otherwise, contact the clinic that sent you this link." It reveals nothing, not even whether the order exists (D25).
 
 Privacy:

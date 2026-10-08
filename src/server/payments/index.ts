@@ -143,7 +143,7 @@ async function startAttempt(ctx: PaymentsContext, orderId: string, payKey: strin
     if (order.status === "paid") return "paid";
     if (order.status === "needs_review") return "in_progress";
     if (order.status !== "sent") return "not_charged";
-    // A link can start a payment for 30 days (§6).
+    // A link can start a payment until it expires, 90 days after it was sent (§6, D87).
     if (order.linkExpiresAt!.getTime() <= ctx.now().getTime()) return "not_charged";
     const [live] = await tx
       .select({ id: paymentAttempts.id })

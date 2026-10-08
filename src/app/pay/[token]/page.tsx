@@ -12,6 +12,7 @@ import { ProductImage } from "@/ui/components/ProductImage";
 import { TEST_CARDS } from "@/server/adapters/stub-payments";
 import { Confirming } from "./Confirming";
 import { ErrorSummary } from "./ErrorSummary";
+import { requestNewLinkAction } from "./actions";
 import { PayForm } from "./PayForm";
 import styles from "./pay.module.css";
 
@@ -61,6 +62,9 @@ export default async function PayPage({ params, searchParams }: Props) {
             {notice && NOTICES[notice] && <ErrorSummary message={NOTICES[notice]} />}
             <PayForm token={token} payKey={randomUUID()} totalLabel={formatCents(view.totalCents)} />
             {paymentsMode() === "stub" && <TestCards />}
+            <p className={styles.help}>
+              This link works until {formatDate(view.linkExpiresAt, view.timeZone)}. After that you can ask for a new one.
+            </p>
             <p className={styles.help}>Questions about this order? Contact {view.practiceName}.</p>
           </>
         )}
@@ -107,7 +111,14 @@ export default async function PayPage({ params, searchParams }: Props) {
         {view.state === "expired" && (
           <>
             <h1>This link has expired</h1>
-            <p className={styles.lede}>Contact {view.providerName}&apos;s clinic for a new one.</p>
+            <p className={styles.lede}>
+              You can ask for a new one. We&apos;ll send it to the email address {view.practiceName} has for you.
+            </p>
+            <form action={requestNewLinkAction}>
+              <input type="hidden" name="token" value={token} />
+              <button className="button button-primary">Send me a new link</button>
+            </form>
+            <p className={styles.help}>Or contact {view.providerName}&apos;s clinic.</p>
           </>
         )}
       </main>
