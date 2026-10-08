@@ -18,8 +18,10 @@ const steps: [name: string, command: string, env?: NodeJS.ProcessEnv][] = [
   ["Typecheck", "npx next typegen && npx tsc --noEmit"],
   ["Lint", "npx eslint ."],
   ["Test database", "docker compose up -d --wait db-test"],
-  ["Unit and integration tests", "npx vitest run"],
+  // The JSON report gives the README check the run's own test count.
+  ["Unit and integration tests", "npx vitest run --reporter=default --reporter=json --outputFile=tests/.results/vitest.json"],
   ["Reconcile a fresh seed", "node scripts/seed.ts --reset && node scripts/reconcile.ts", testDatabase],
+  ["README numbers", "node scripts/check-readme.ts"],
 ];
 
 const results: string[] = [];

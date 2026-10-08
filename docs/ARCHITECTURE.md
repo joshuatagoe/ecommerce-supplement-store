@@ -556,7 +556,7 @@ Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, messag
   - `applied` is how many migrations the database has, and `latest` the newest of them that this build knows (`null` if the database has one this build doesn't).
   - `milestone` is the latest milestone in the build. Each milestone's commit updates it in `src/server/release.ts`.
   - `commit` is the deployed commit from Render's `RENDER_GIT_COMMIT`, and `null` off Render.
-- Commands: `npm run setup`, `seed`, `reconcile`, `metrics` (D65), `sweep`, `verify`, `verify:full`, `push`, `smoke`, `load:l1`, `load:l2`, `load:l3`, `drill:outage`.
+- Commands: `npm run setup`, `seed`, `reconcile`, `metrics` (D65), `verify`, `push`, `smoke`, `demo`, `load:race`, `load:l1`, `load:l2`, `load:l3`, `drill:outage`. The sweep has no command of its own: it runs inside the server (§5).
 
 ### Sales list: search, filters and totals
 
@@ -584,7 +584,7 @@ One list shows every order the provider has created (D31):
 flowchart TB
   portal["Provider portal: laptop first, interactive<br/>Sales · New order · Order details · My store · Sign in"] --> comps
   paypage["Pay page: phone first<br/>server-rendered, the Pay form works without JavaScript"] --> comps
-  comps["Shared components<br/>Money · StatusBadge · PriceOrMarginInput · QuantityField · LineEditor<br/>DataTable · Alert · ErrorSummary · EmptyState · CopyLinkButton · DemoBanner · ProductImage"]
+  comps["Shared components<br/>StatusBadge · ConfirmDialog · ProductImage · DemoBanner<br/>and each page's editor: StoreEditor · DraftEditor · SalesList · PayForm"]
   comps --> tokens["Design tokens<br/>palette A · portal: Source Sans 3, 16px · patient: Atkinson Hyperlegible Next, 19px"]
   comps --> shared["Shared with the server<br/>Pricing · money formatting · status words · Zod schemas"]
   comps --> io["Talking to the server<br/>server actions · autosave after a 1 s pause · SSE on the pay page"]
@@ -661,7 +661,7 @@ The target is **WCAG 2.2 AA**.
 
 ## 11. Observability
 
-- **Logs:** pino writes structured JSON, with patient fields redacted. Each request gets a request ID.
+- **Logs:** pino writes structured JSON, with patient fields redacted. Planned but not built: a request ID on every request and in every log line, parked with the rest of the observability work for after the build (status board, "Later").
 - **One log line per status change**, with the order ref, the old and new status, and the actor. No patient data.
 - **Health:** `GET /api/health` checks the database connection and the migration version, and names the milestone and commit it serves. Render uses it to decide whether a new deploy gets traffic; the smoke test uses the commit to know the new build is live.
 - **Totals always come from the database,** never from a cache.
@@ -757,9 +757,9 @@ flowchart LR
 
 | Layer | What runs | What it catches |
 |---|---|---|
-| `npm run verify` | Typecheck, lint, golden cases, unit and property tests, integration tests against the local Postgres, reconciliation on a fresh seed, and a check that `.claude/skills/` matches `.cursor/skills/` (D41) | Most bugs, before anything leaves the laptop |
+| `npm run verify` | Typecheck, lint, golden cases, unit and property tests, integration tests against the local Postgres, reconciliation on a fresh seed, the README number check, and a check that `.claude/skills/` matches `.cursor/skills/` (D41) | Most bugs, before anything leaves the laptop |
 | `npm run push` | `verify` once, then `git push origin` and `git push gitlab` | A push that skipped the checks, or reached only one remote |
-| GitHub CI | Everything in `verify`, plus Playwright (end-to-end, axe, keyboard) and the README number check | "Works on my machine" problems and accessibility regressions |
+| GitHub CI | Everything in `verify` (the README number check included), plus Playwright (end-to-end, axe, keyboard, contrast themes) | "Works on my machine" problems and accessibility regressions |
 | Branch protection | `main` accepts only merges whose CI passed, admins included | Untested code reaching production |
 | Render health check | A new version gets traffic only after `/api/health` passes | A version that can't start. The old version keeps serving. |
 | `npm run smoke` | Against the live URL: waits for the expected commit, then checks health, that the portal login works, and that a seeded pay link loads (copied through the portal, so it needs no key). Allows 2 minutes for Render Free to wake. Read only. It also runs in GitHub Actions after every merge to `main`, waiting up to 15 minutes for Render to deploy (D69). | Production-only mistakes, such as a wrong signing key |
@@ -802,8 +802,8 @@ src/
   ui/                   components/, tokens.css, fonts/
 src/instrumentation.ts  starts the sweep (Node runtime only; Next.js wants it inside src/ when src/ exists)
 drizzle/                SQL migrations (committed)
-scripts/                setup, migrate, verify, push, check-skills, seed, reconcile, sweep, smoke, drill-outage
-tests/                  golden/, unit/, integration/, e2e/, load/ (k6)
+scripts/                setup, migrate, verify, push, check-skills, check-readme, seed, reconcile, metrics, smoke, load (k6 runs and the drill)
+tests/                  golden/, unit/, integration/, e2e/, load/ (k6), demo/ (the video script)
 docs/                   this doc, design/palettes.html, LOAD_TESTS.md
 docker-compose.yml
 ```
