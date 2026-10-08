@@ -63,7 +63,7 @@ export default async function PayPage({ params, searchParams }: Props) {
             <PayForm token={token} payKey={randomUUID()} totalLabel={formatCents(view.totalCents)} />
             {paymentsMode() === "stub" && <TestCards />}
             <p className={styles.help}>
-              This link works until {formatDate(view.linkExpiresAt, view.timeZone)}. After that you can ask for a new one.
+              This link works through {formatDate(lastFullDay(view.linkExpiresAt), view.timeZone)}. After that you can ask for a new one.
             </p>
             <p className={styles.help}>Questions about this order? Contact {view.practiceName}.</p>
           </>
@@ -124,6 +124,14 @@ export default async function PayPage({ params, searchParams }: Props) {
       </main>
     </>
   );
+}
+
+/**
+ * The last full day a link works (D87). It expires at the time of day it was
+ * sent, so naming the expiry date itself would be wrong for part of that day.
+ */
+function lastFullDay(expiresAt: Date): Date {
+  return new Date(expiresAt.getTime() - 24 * 60 * 60 * 1000);
 }
 
 /** Each item with its price, the retail price struck through (read as "Retail price $40.00"), and the saving. */

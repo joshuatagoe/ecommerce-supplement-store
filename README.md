@@ -71,7 +71,7 @@ npm run dev        # then open http://localhost:3000
 
 ## Tests
 
-- **361 unit, integration and property tests** (Vitest): golden money cases, property tests over thousands of random prices, every database rule against real Postgres, every row of the Pay flow's failure table, and races (twenty Sends at once give one link; fifty Pays at once give one charge).
+- **363 unit, integration and property tests** (Vitest): golden money cases, property tests over thousands of random prices, every database rule against real Postgres, every row of the Pay flow's failure table, and races (twenty Sends at once give one link; fifty Pays at once give one charge).
 - **62 browser tests** (Playwright): every user flow, axe on every page and pay-page state, keyboard-only runs, 320px-wide screens, and contrast themes.
 
 These two counts are checked against a fresh run by `npm run verify`, so they can't go stale.

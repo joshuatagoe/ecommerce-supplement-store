@@ -75,6 +75,8 @@ test("the provider builds an order with live earnings, it saves itself, and Send
 
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Sent to Sam Okafor.")).toBeVisible();
+  // The exact moment it stops working, since it expires at the time of day it was sent (D87).
+  await expect(page.getByText(/The link works until [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2}\s[AP]M\./)).toBeVisible();
   const link = page.getByLabel("Pay link");
   await expect(link).toHaveValue(/\/pay\/[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}\.[A-Za-z0-9_-]{22}$/);
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
