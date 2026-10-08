@@ -66,6 +66,12 @@ function row(page: Page, ref: string) {
   return page.getByRole("row").filter({ hasText: ref });
 }
 
+function shortcut(page: Page, name: string) {
+  return page.getByRole("navigation", { name: "Shortcuts" }).getByRole("link", { name });
+}
+
+const summaryNumber = async (page: Page, id: string) => Number((await page.getByTestId(id).innerText()).replace(/[^\d]/g, ""));
+
 test("signing in opens Sales, and a provider with no orders sees where to start", async ({ page }) => {
   // The seed gives both demo providers months of orders (M6), so this test adds one with none.
   const [practice] = await sql("SELECT practice_id FROM providers WHERE display_name = 'Dr. Patel'");
@@ -81,9 +87,10 @@ test("signing in opens Sales, and a provider with no orders sees where to start"
   await sql("DELETE FROM providers WHERE id = $1", [newcomer.id]);
 });
 
-test("a paid order shows in Sales with its status, totals and Order again, and in this month's totals", async ({ page, browser }) => {
+test("a paid order shows in Sales with its status, totals and Order again, and in Paid this month", async ({ page, browser }) => {
   await signIn(page);
-  const before = Number((await page.getByTestId("month-count").textContent()) ?? "0");
+  await shortcut(page, "Paid this month").click();
+  const before = await summaryNumber(page, "summary-paid");
   const { ref, link } = await sendOrder(page);
   await payAsPatient(browser, link);
 
@@ -93,7 +100,8 @@ test("a paid order shows in Sales with its status, totals and Order again, and i
   await expect(paid.getByText("$36.00")).toBeVisible();
   await expect(paid.getByText("$15.73")).toBeVisible();
   await expect(paid.getByRole("button", { name: `Order again: ${ref}` })).toBeVisible();
-  await expect(page.getByTestId("month-count")).toHaveText(String(before + 1));
+  await shortcut(page, "Paid this month").click();
+  await expect(page.getByTestId("summary-paid")).toHaveText(String(before + 1));
 });
 
 test("search finds a patient's orders, and the text never goes in the URL", async ({ page }) => {
@@ -107,7 +115,10 @@ test("search finds a patient's orders, and the text never goes in the URL", asyn
   await page.getByRole("button", { name: "Search" }).click();
   await expect(row(page, ref)).toBeVisible();
   await expect(page.getByRole("cell", { name: "Sam Okafor" })).toHaveCount(0);
-  await expect(page.getByRole("status").filter({ hasText: /^\d+ orders?$/ })).toBeVisible();
+  const found = page.getByRole("status").filter({ hasText: /^\d+ orders?$/ });
+  await expect(found).toBeVisible();
+  // The summary follows the search too.
+  await expect(page.getByTestId("summary-orders")).toHaveText((await found.innerText()).split(" ")[0]);
   expect(page.url()).not.toContain("gonzalez");
   expect(requests.filter((url) => url.toLowerCase().includes("gonzalez"))).toEqual([]);
 });
@@ -123,14 +134,84 @@ test("filters live in the URL, and an empty result says how to clear them", asyn
   await expect(page.getByRole("table")).toBeVisible();
 });
 
-test("the footer adds up the paid orders in view", async ({ page, browser }) => {
+test("the summary sits above the list and adds up the paid orders in view, whatever the filters", async ({ page, browser }) => {
   await signIn(page);
   const { link } = await sendOrder(page);
   await payAsPatient(browser, link);
   await page.goto("/sales?status=paid");
-  await expect(page.getByTestId("footer-totals")).toContainText(/^Paid orders in this view: \d+ · \$[\d,]+\.\d\d · earned \$[\d,]+\.\d\d · fees \$[\d,]+\.\d\d$/);
+  // Every order in this view is paid.
+  await expect(page.getByTestId("summary-paid")).toHaveText(await page.getByTestId("summary-orders").innerText());
+  await expect(page.getByTestId("summary-sales")).toHaveText(/^\$[\d,]+\.\d\d$/);
+  const summary = await page.getByRole("region", { name: "Summary" }).boundingBox();
+  const table = await page.getByRole("table").boundingBox();
+  expect(summary!.y).toBeLessThan(table!.y);
   await page.goto("/sales?status=draft");
-  await expect(page.getByTestId("footer-totals")).toHaveText("No paid orders in this view.");
+  await expect(page.getByTestId("summary-paid")).toHaveText("0");
+  await expect(page.getByTestId("summary-sales")).toHaveText("$0.00");
+});
+
+test("shortcuts apply filters in one click, and show which one is on", async ({ page }) => {
+  await signIn(page);
+  await shortcut(page, "Waiting for payment").click();
+  await expect(page).toHaveURL(/status=sent/);
+  await expect(shortcut(page, "Waiting for payment")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByLabel("Status")).toHaveValue("sent");
+  await expect(page.getByTestId("summary-view")).toHaveText("Waiting for payment");
+  for (const badge of await page.getByTestId("status-badge").all()) await expect(badge).toHaveText("Sent");
+
+  await shortcut(page, "Paid last month").click();
+  await expect(page).toHaveURL(/status=paid&dateField=paid&from=\d{4}-\d\d-01&to=\d{4}-\d\d-\d\d/);
+  await expect(page.getByLabel("Date", { exact: true })).toHaveValue("paid");
+  await expect(shortcut(page, "Waiting for payment")).not.toHaveAttribute("aria-current");
+});
+
+test("the product filter lists the orders that include it, and counts its bottles sold", async ({ page, browser }) => {
+  await signIn(page);
+  await page.getByLabel("Product").selectOption({ label: "Magnesium Glycinate" });
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page).toHaveURL(/product=/);
+  const filtered = page.url();
+  const before = await summaryNumber(page, "summary-bottles");
+
+  const { ref, link } = await sendOrder(page);
+  await payAsPatient(browser, link);
+  await page.goto(filtered);
+  await expect(page.getByTestId("summary-bottles")).toHaveText(String(before + 1));
+  await expect(page.getByTestId("summary-view")).toContainText("Magnesium Glycinate");
+  await expect(row(page, ref)).toBeVisible();
+});
+
+test("pages are numbered and kept in the URL, so Back returns to the page before", async ({ page }) => {
+  // Enough old drafts for a second page, whatever the seed and earlier tests left; removed at the end.
+  const [rivera] = await sql("SELECT id, practice_id FROM providers WHERE display_name = 'Dr. Rivera'");
+  const [patient] = await sql("SELECT id FROM patients WHERE practice_id = $1 ORDER BY first_name LIMIT 1", [rivera.practice_id]);
+  const tag = Date.now().toString(36).slice(-4).toUpperCase();
+  const refs = Array.from({ length: 26 }, (_, i) => `PG${String(i).padStart(2, "0")}-${tag}`);
+  await sql(
+    `INSERT INTO orders (ref, provider_id, practice_id, patient_id, status, created_at)
+     SELECT r, $1, $2, $3, 'draft', now() - interval '400 days' FROM unnest($4::text[]) AS r`,
+    [rivera.id, rivera.practice_id, patient.id, refs],
+  );
+  try {
+    await signIn(page);
+    await shortcut(page, "Drafts").click();
+    const pages = page.getByRole("navigation", { name: "Pages" });
+    await expect(pages).toContainText(/1–25 of \d+/);
+    await pages.getByRole("link", { name: "Next" }).click();
+    await expect(page).toHaveURL(/page=2/);
+    await expect(pages).toContainText(/26–\d+ of \d+/);
+    await expect(pages.getByText("2", { exact: true })).toHaveAttribute("aria-current", "page");
+    await page.goBack();
+    await expect(page).not.toHaveURL(/page=2/);
+    await expect(pages).toContainText(/1–25 of \d+/);
+
+    // A page past the end shows the last page.
+    await page.goto("/sales?status=draft&page=999");
+    await expect(pages.getByRole("link", { name: "Next" })).toHaveCount(0);
+    await expect(page.getByRole("table")).toBeVisible();
+  } finally {
+    await sql("DELETE FROM orders WHERE ref = ANY($1::text[])", [refs]);
+  }
 });
 
 test("Order details shows where every cent of a paid order went, and its audit trail (F5)", async ({ page, browser }) => {

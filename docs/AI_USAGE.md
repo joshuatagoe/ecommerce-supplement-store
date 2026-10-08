@@ -245,3 +245,9 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 
 47. **The AI's pricing screens showed "You earn" without the fee it comes after.** Testing M4, the user read "You earn $15.73" at $36.00 as ignoring the 0.75% fee. The money was right, because the margin is what's left after the fee (D5), but nothing on the screen said so. Every place a price is set now shows the cost and fee under "You earn" (D78).
 48. **The AI's helper for scratch test databases had the same gap as the app's pool before D72: no error listener.** Dropping a scratch database WITH (FORCE) can end a connection the pool is still closing, and Postgres reports that on the idle client. With nothing listening, that one error failed CI twice on L1's push run after all 342 tests had passed. A new test ends a scratch pool's connection from outside and reproduced it locally; the helper now expects that one error and still fails the run on any other.
+
+## 2026-10-08 — L5 (UX at scale: Sales and product search)
+
+### Where AI misled us or we course-corrected
+
+49. **The AI first made Sales' shortcuts in-app links, and the filter fields kept showing the old values.** After "Waiting for payment" the URL and the list said Sent, but the Status field still said All statuses, because an in-app navigation keeps the form's fields. Re-creating the form on each change then left the old form in the page beside the new one, so the field's label pointed at the stale copy. The browser test that checks the field caught both. The shortcuts are now plain links that load the page fresh, like the filter form itself (D80).

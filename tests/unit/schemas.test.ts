@@ -124,6 +124,15 @@ describe("searches", () => {
     expect(parseInput(searchOrdersInput, { dateField: "paid", from: "2026-10-01", to: "2026-10-31" }).ok).toBe(true);
     expect(parseInput(searchOrdersInput, { from: "2026-10-32" }).ok).toBe(false);
   });
+
+  it("takes a page number from the URL and a product by its ID (L5)", () => {
+    expect(parseInput(searchOrdersInput, { page: "2" })).toEqual({ ok: true, data: { dateField: "created", page: 2 } });
+    expect(parseInput(searchOrdersInput, { page: "0" }).ok).toBe(false);
+    expect(parseInput(searchOrdersInput, { page: "two" }).ok).toBe(false);
+    const product = "0199b0a0-0000-7000-8000-000000000001";
+    expect(parseInput(searchOrdersInput, { product })).toEqual({ ok: true, data: { dateField: "created", product } });
+    expect(parseInput(searchOrdersInput, { product: "magnesium" }).ok).toBe(false);
+  });
 });
 
 describe("pay (§5: the browser never sends an amount)", () => {

@@ -11,7 +11,7 @@ import { logLinkSender } from "@/server/adapters/log-link-sender";
 import { stubPayments } from "@/server/adapters/stub-payments";
 import { cancelOrder, type OrdersContext, saveDraft, sendOrder, startOrder } from "@/server/orders";
 import { pay } from "@/server/payments";
-import { monthTotals, orderAudit, platformMetrics, searchOrders } from "@/server/reporting";
+import { orderAudit, platformMetrics, searchOrders, soldProducts } from "@/server/reporting";
 import { makeClinic, type Scratch, scratchDatabase, type TestClinic } from "./scratch";
 
 const KEY = "link-signing-key-that-is-at-least-32-chars";
@@ -27,14 +27,22 @@ function orders(at: Date): OrdersContext {
   return { db: scratch.db, now: () => at, feeRateBps: 75, linkSigningKey: KEY, appUrl: "https://store.test", linkTtlDays: 30, linkSender: logLinkSender };
 }
 
-async function order(c: TestClinic, patientId: string, created: string, options: { sent?: string; paid?: string; from?: string } = {}) {
+type Line = { catalogItemId: string; quantity: number; priceCents: number };
+
+async function order(
+  c: TestClinic,
+  patientId: string,
+  created: string,
+  options: { sent?: string; paid?: string; from?: string; lines?: Line[] } = {},
+) {
   const at = new Date(created);
   const started = options.from
     ? await startOrder(orders(at), c.provider, { fromOrderRef: options.from })
     : await startOrder(orders(at), c.provider, { patientId });
   if (!started.ok) throw new Error(started.error.message);
   if (!options.from) {
-    await saveDraft(orders(at), c.provider, { ref: started.ref, lines: [{ catalogItemId: c.magnesiumId, quantity: 1, priceCents: 3600 }] });
+    const lines = options.lines ?? [{ catalogItemId: c.magnesiumId, quantity: 1, priceCents: 3600 }];
+    await saveDraft(orders(at), c.provider, { ref: started.ref, lines });
   }
   if (options.sent) {
     const sent = await sendOrder(orders(new Date(options.sent)), c.provider, started.ref);
@@ -78,8 +86,6 @@ beforeAll(async () => {
   refs.otherProvider = await order(other, other.patientId, "2026-11-05T16:00:00Z", { sent: "2026-11-05T17:00:00Z", paid: "2026-11-05T18:00:00Z" });
 }, 60_000);
 afterAll(() => scratch?.drop());
-
-const ONE_BOTTLE = { count: 1, totalCents: 3600, marginCents: 1573, feeCents: 27 };
 
 describe("searchOrders: the Sales list (F4, D31)", () => {
   it("lists every order the provider created, newest first, with its status word and action", async () => {
@@ -147,38 +153,52 @@ describe("searchOrders: the Sales list (F4, D31)", () => {
     expect(bySent.rows[0].ref).toBe(refs.again);
   });
 
-  it("adds up the paid orders in the view for the footer", async () => {
+  it("adds up the paid orders in the view for the summary, with no product totals without a product", async () => {
     const paid = await searchOrders(ctx(), provider(clinic), { dateField: "created", status: "paid" });
-    expect(paid.footerTotals).toEqual({ count: 4, totalCents: 14400, marginCents: 6292, feeCents: 108 });
+    expect(paid.paid).toEqual({ count: 4, totalCents: 14400, marginCents: 6292, feeCents: 108 });
+    expect(paid.product).toBeNull();
     const none = await searchOrders(ctx(), provider(clinic), { dateField: "created", status: "sent" });
-    expect(none.footerTotals).toEqual({ count: 0, totalCents: 0, marginCents: 0, feeCents: 0 });
+    expect(none.paid).toEqual({ count: 0, totalCents: 0, marginCents: 0, feeCents: 0 });
   });
 
-  it("pages 25 at a time with a cursor, and counts every match", async () => {
+  it("pages by number and counts every match; a page past the end shows the last page", async () => {
     const first = await searchOrders(ctx(), provider(clinic), { dateField: "created" }, 3);
+    expect(first).toMatchObject({ count: 8, page: 1, pageCount: 3 });
     expect(first.rows).toHaveLength(3);
-    expect(first.count).toBe(8);
-    expect(first.nextCursor).toEqual(expect.any(String));
-    const second = await searchOrders(ctx(), provider(clinic), { dateField: "created", cursor: first.nextCursor! }, 3);
+    const second = await searchOrders(ctx(), provider(clinic), { dateField: "created", page: 2 }, 3);
+    expect(second.page).toBe(2);
     expect(second.rows.map((row) => row.ref)).toEqual([refs.cancelled, refs.sent, refs.october]);
-    const last = await searchOrders(ctx(), provider(clinic), { dateField: "created", cursor: second.nextCursor! }, 3);
-    expect(last.rows).toHaveLength(2);
-    expect(last.nextCursor).toBeNull();
+    const past = await searchOrders(ctx(), provider(clinic), { dateField: "created", page: 99 }, 3);
+    expect(past).toMatchObject({ page: 3, pageCount: 3 });
+    expect(past.rows.map((row) => row.ref)).toEqual([refs.september, refs.expired]);
+    const nothing = await searchOrders(ctx(), provider(clinic), { dateField: "created", text: "nobody" }, 3);
+    expect(nothing).toMatchObject({ count: 0, page: 1, pageCount: 1, rows: [] });
   });
 });
 
-describe("monthTotals: the headline (D31)", () => {
-  it("covers this month so far by paid date in the practice's time zone, ignoring filters", async () => {
-    expect(await monthTotals(ctx(), provider(clinic))).toEqual({ month: "November 2026", ...ONE_BOTTLE });
-    const endOfOctober = { db: scratch.db, now: () => new Date("2026-11-01T06:00:00Z") };
-    // 11pm Pacific on October 31: both October payments count.
-    expect(await monthTotals(endOfOctober, provider(clinic))).toEqual({
-      month: "October 2026",
-      count: 2,
-      totalCents: 7200,
-      marginCents: 3146,
-      feeCents: 54,
+describe("the product filter: what has been sold (F4, L5)", () => {
+  it("lists the orders that include the product, and counts that product's own paid bottles, sales and earnings", async () => {
+    // A clinic of its own, in July, so the views and metrics tests above and below are unchanged.
+    const shop = await makeClinic(scratch.pool);
+    const magnesium = (quantity: number) => ({ catalogItemId: shop.magnesiumId, quantity, priceCents: 3600 });
+    const omega = { catalogItemId: shop.omegaId, quantity: 1, priceCents: 2700 };
+    const both = await order(shop, shop.patientId, "2026-07-06T16:00:00Z", {
+      sent: "2026-07-06T17:00:00Z",
+      paid: "2026-07-06T18:00:00Z",
+      lines: [magnesium(2), omega],
     });
+    await order(shop, shop.patientId, "2026-07-07T16:00:00Z", { sent: "2026-07-07T17:00:00Z", paid: "2026-07-07T18:00:00Z", lines: [omega] });
+    const unpaid = await order(shop, shop.patientId, "2026-07-08T16:00:00Z", { sent: "2026-07-08T17:00:00Z", lines: [magnesium(1)] });
+
+    const result = await searchOrders(ctx(), provider(shop), { dateField: "created", product: shop.magnesiumId });
+    expect(result.rows.map((row) => row.ref)).toEqual([unpaid, both]);
+    // The whole paid order: 2 Magnesium at $36.00 and 1 Omega at $27.00.
+    expect(result.paid).toEqual({ count: 1, totalCents: 9900, marginCents: 4327, feeCents: 75 });
+    // Magnesium alone, paid only: 2 bottles, $72.00, earning $15.73 each.
+    expect(result.product).toEqual({ bottles: 2, totalCents: 7200, marginCents: 3146, feeCents: 54 });
+
+    expect((await soldProducts(ctx(), provider(shop))).map((p) => p.id)).toEqual([shop.magnesiumId, shop.omegaId]);
+    expect((await soldProducts(ctx(), provider(other))).map((p) => p.id)).not.toContain(shop.omegaId);
   });
 });
 

@@ -117,6 +117,21 @@ test("Max profit sets the retail price, and the fee shows next to what the provi
   await expect(magnesium.getByRole("status")).toContainText("Saved");
 });
 
+test("the catalog has a search box, and says when nothing matches (L5)", async ({ page }) => {
+  await signIn(page);
+  const search = page.getByLabel("Search the catalog");
+  const catalog = page.getByRole("table");
+  await search.fill("omega");
+  await expect(catalog.getByRole("row").filter({ hasText: "Ultimate Omega" })).toBeVisible();
+  await expect(catalog.getByRole("row").filter({ hasText: "Magnesium Glycinate" })).toHaveCount(0);
+
+  await search.fill("no such product");
+  await expect(page.getByText("No products match “no such product”.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(search).toHaveValue("");
+  await expect(catalog.getByRole("row").filter({ hasText: "Magnesium Glycinate" })).toBeVisible();
+});
+
 test("an added item starts at the no-profit price, and Remove takes it out", async ({ page }) => {
   await signIn(page);
   const add = page.getByRole("button", { name: /^Add .+ to My store$/ }).first();

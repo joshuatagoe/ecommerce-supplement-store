@@ -18,7 +18,10 @@ export type SalesFilters = {
   dateField: "created" | "sent" | "paid";
   from?: string;
   to?: string;
-  cursor?: string;
+  /** Orders that include this catalog item (L5). */
+  product?: string;
+  /** 1-based. A page past the end shows the last page. */
+  page?: number;
 };
 
 export type SalesRow = {
@@ -38,6 +41,8 @@ export type SalesRow = {
 };
 
 export type PaidTotals = { count: number; totalCents: number; marginCents: number; feeCents: number };
+/** One product's share of the paid orders in view: what has been sold (L5). */
+export type ProductTotals = { bottles: number; totalCents: number; marginCents: number; feeCents: number };
 
 const DATE_COLUMNS = { created: "o.created_at", sent: "o.sent_at", paid: "o.paid_at" } as const;
 
@@ -63,45 +68,37 @@ function conditions(ctx: ReadContext, provider: ProviderView, filters: SalesFilt
   const column = sql.raw(DATE_COLUMNS[filters.dateField]);
   if (filters.from) parts.push(sql`(${column} AT TIME ZONE ${provider.timeZone})::date >= ${filters.from}::date`);
   if (filters.to) parts.push(sql`(${column} AT TIME ZONE ${provider.timeZone})::date <= ${filters.to}::date`);
+  if (filters.product) {
+    parts.push(sql`EXISTS (SELECT 1 FROM order_lines l WHERE l.order_id = o.id AND l.catalog_item_id = ${filters.product})`);
+  }
   return sql.join(parts, sql` AND `);
 }
 
-function decodeCursor(cursor: string | undefined): number {
-  if (!cursor) return 0;
-  try {
-    const offset = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")).offset;
-    return Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
-  } catch {
-    return 0;
-  }
-}
-
-const encodeCursor = (offset: number) => Buffer.from(JSON.stringify({ offset })).toString("base64url");
+export type SalesResult = {
+  rows: SalesRow[];
+  count: number;
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  paid: PaidTotals;
+  product: ProductTotals | null;
+};
 
 /**
  * §8 searchOrders: every order the provider created, newest first by the
- * chosen date (orders without it last), 25 to a page, with the count of all
- * matches and the totals of the paid orders among them.
+ * chosen date (orders without it last), in numbered pages of 25, with the count
+ * of all matches, the totals of the paid orders among them, and, when a
+ * product is chosen, that product's own share of those paid orders (L5).
  */
 export async function searchOrders(
   ctx: ReadContext,
   provider: ProviderView,
   filters: SalesFilters,
   pageSize = 25,
-): Promise<{ rows: SalesRow[]; count: number; footerTotals: PaidTotals; nextCursor: string | null }> {
+): Promise<SalesResult> {
   const where = conditions(ctx, provider, filters);
   const column = sql.raw(DATE_COLUMNS[filters.dateField]);
-  const offset = decodeCursor(filters.cursor);
 
-  const page = await ctx.db.execute(sql`
-    SELECT o.ref, p.first_name, p.last_name, o.status, o.link_expires_at, o.link_version,
-           o.created_at, o.sent_at, o.paid_at, o.margin_cents,
-           COALESCE(o.total_cents, (SELECT sum(l.unit_price_cents * l.quantity) FROM order_lines l WHERE l.order_id = o.id))::text AS total_cents,
-           EXISTS (SELECT 1 FROM payment_attempts a WHERE a.order_id = o.id AND a.status = 'pending') AS payment_in_progress
-      FROM orders o JOIN patients p ON p.id = o.patient_id
-     WHERE ${where}
-     ORDER BY ${column} DESC NULLS LAST, o.created_at DESC, o.id DESC
-     LIMIT ${pageSize} OFFSET ${offset}`);
   const [totals] = (
     await ctx.db.execute(sql`
       SELECT count(*)::int AS count,
@@ -112,6 +109,33 @@ export async function searchOrders(
         FROM orders o JOIN patients p ON p.id = o.patient_id
        WHERE ${where}`)
   ).rows;
+  const count = Number(totals.count);
+  const pageCount = Math.max(1, Math.ceil(count / pageSize));
+  const pageNumber = Math.min(Math.max(1, filters.page ?? 1), pageCount);
+  const offset = (pageNumber - 1) * pageSize;
+
+  const page = await ctx.db.execute(sql`
+    SELECT o.ref, p.first_name, p.last_name, o.status, o.link_expires_at, o.link_version,
+           o.created_at, o.sent_at, o.paid_at, o.margin_cents,
+           COALESCE(o.total_cents, (SELECT sum(l.unit_price_cents * l.quantity) FROM order_lines l WHERE l.order_id = o.id))::text AS total_cents,
+           EXISTS (SELECT 1 FROM payment_attempts a WHERE a.order_id = o.id AND a.status = 'pending') AS payment_in_progress
+      FROM orders o JOIN patients p ON p.id = o.patient_id
+     WHERE ${where}
+     ORDER BY ${column} DESC NULLS LAST, o.created_at DESC, o.id DESC
+     LIMIT ${pageSize} OFFSET ${offset}`);
+
+  // The chosen product's own lines in the paid orders in view, from the split frozen at Send.
+  const product = filters.product
+    ? (
+        await ctx.db.execute(sql`
+          SELECT COALESCE(sum(l.quantity), 0)::text AS bottles,
+                 COALESCE(sum(l.unit_price_cents * l.quantity), 0)::text AS total,
+                 COALESCE(sum(l.unit_margin_cents * l.quantity), 0)::text AS margin,
+                 COALESCE(sum(l.unit_fee_cents * l.quantity), 0)::text AS fee
+            FROM orders o JOIN patients p ON p.id = o.patient_id JOIN order_lines l ON l.order_id = o.id
+           WHERE ${where} AND o.status = 'paid' AND l.catalog_item_id = ${filters.product}`)
+      ).rows[0]
+    : null;
 
   const now = ctx.now();
   const rows: SalesRow[] = page.rows.map((row) => {
@@ -135,38 +159,35 @@ export async function searchOrders(
       marginCents: row.margin_cents === null ? null : Number(row.margin_cents),
     };
   });
-  const count = Number(totals.count);
   return {
     rows,
     count,
-    footerTotals: {
+    page: pageNumber,
+    pageCount,
+    pageSize,
+    paid: {
       count: Number(totals.paid),
       totalCents: cents(totals.total),
       marginCents: cents(totals.margin),
       feeCents: cents(totals.fee),
     },
-    nextCursor: offset + pageSize < count ? encodeCursor(offset + pageSize) : null,
+    product: product && {
+      bottles: Number(product.bottles),
+      totalCents: cents(product.total),
+      marginCents: cents(product.margin),
+      feeCents: cents(product.fee),
+    },
   };
 }
 
-/** The headline (D31): this month so far by paid date in the practice's time zone, ignoring filters. */
-export async function monthTotals(ctx: ReadContext, provider: ProviderView): Promise<PaidTotals & { month: string }> {
-  const now = ctx.now();
-  const [row] = (
-    await ctx.db.execute(sql`
-      SELECT count(*)::int AS count, COALESCE(sum(total_cents), 0)::text AS total,
-             COALESCE(sum(margin_cents), 0)::text AS margin, COALESCE(sum(fee_cents), 0)::text AS fee
-        FROM orders
-       WHERE provider_id = ${provider.id} AND status = 'paid' AND paid_at <= ${now}
-         AND (paid_at AT TIME ZONE ${provider.timeZone}) >= date_trunc('month', ${now}::timestamptz AT TIME ZONE ${provider.timeZone})`)
-  ).rows;
-  return {
-    month: new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: provider.timeZone }).format(now),
-    count: Number(row.count),
-    totalCents: cents(row.total),
-    marginCents: cents(row.margin),
-    feeCents: cents(row.fee),
-  };
+/** The products in any of this provider's orders, by name: the choices for Sales' product filter (L5). */
+export async function soldProducts(ctx: ReadContext, provider: ProviderView): Promise<{ id: string; name: string }[]> {
+  const rows = await ctx.db.execute(sql`
+    SELECT DISTINCT c.id, c.name
+      FROM orders o JOIN order_lines l ON l.order_id = o.id JOIN catalog_items c ON c.id = l.catalog_item_id
+     WHERE o.provider_id = ${provider.id}
+     ORDER BY c.name`);
+  return rows.rows.map((row) => ({ id: row.id as string, name: row.name as string }));
 }
 
 export type AuditEvent = {

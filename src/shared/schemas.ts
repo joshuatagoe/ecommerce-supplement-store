@@ -101,7 +101,10 @@ export const searchOrdersInput = z.object({
   dateField: z.enum(["created", "sent", "paid"]).default("created"),
   from: day().optional(),
   to: day().optional(),
-  cursor: z.string().max(200).optional(),
+  /** Orders that include this product (L5). */
+  product: z.uuid().optional(),
+  /** 1-based; it arrives from the URL as text. */
+  page: z.coerce.number().int().min(1).max(10_000).optional(),
 });
 
 /** A card stays valid through the last day of its expiry month, judged in UTC. */

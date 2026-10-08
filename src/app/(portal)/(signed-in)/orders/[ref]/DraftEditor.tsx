@@ -11,6 +11,7 @@ import type { OrderView, SavedLine } from "@/server/orders";
 import type { StoreItem } from "@/server/store";
 import { centsToField, formatCents, parseDollars, priceRangeMessage } from "@/shared/money";
 import { checkPrice, lineSplit, orderTotals, priceForMarginCents, type Split, unitSplit } from "@/shared/pricing";
+import { matchesProduct } from "@/shared/product-search";
 import type { ActionError } from "@/shared/schemas";
 import { ConfirmDialog } from "@/ui/components/ConfirmDialog";
 import { ProductImage } from "@/ui/components/ProductImage";
@@ -94,6 +95,8 @@ export function DraftEditor({ order, storeItems, feeRateBps, autosaveMs }: Props
   const [edits, setEdits] = useState(0);
   const [sendError, setSendError] = useState<ActionError | null>(null);
   const [sending, startSending] = useTransition();
+  const [search, setSearch] = useState("");
+  const searchField = useRef<HTMLInputElement>(null);
 
   const linesRef = useRef(lines);
   const version = useRef(0);
@@ -293,6 +296,7 @@ export function DraftEditor({ order, storeItems, feeRateBps, autosaveMs }: Props
   }
 
   const addable = storeItems.filter((item) => !lines.some((line) => line.catalogItemId === item.id));
+  const shownAddable = addable.filter((item) => matchesProduct(item, search));
   const sendHint =
     lines.length === 0
       ? "Add an item to send."
@@ -364,8 +368,33 @@ export function DraftEditor({ order, storeItems, feeRateBps, autosaveMs }: Props
       {addable.length > 0 && (
         <section aria-labelledby="add-heading" className={styles.section}>
           <h2 id="add-heading">Add from My store</h2>
+          <div className={styles.addSearch}>
+            <label htmlFor="add-search">Search My store</label>
+            <input
+              ref={searchField}
+              id="add-search"
+              type="search"
+              autoComplete="off"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          {shownAddable.length === 0 && (
+            <p className={styles.empty}>
+              No items in My store match “{search.trim()}”.{" "}
+              <Button
+                className="button"
+                onPress={() => {
+                  setSearch("");
+                  searchField.current?.focus();
+                }}
+              >
+                Clear search
+              </Button>
+            </p>
+          )}
           <ul className={styles.addList}>
-            {addable.map((item) => (
+            {shownAddable.map((item) => (
               <li key={item.id}>
                 <ProductImage src={item.imagePath} alt="" size={40} />
                 <span className={styles.addName}>

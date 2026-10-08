@@ -71,8 +71,8 @@ npm run dev        # then open http://localhost:3000
 
 ## Tests
 
-- **345 unit, integration and property tests** (Vitest): golden money cases, property tests over thousands of random prices, every database rule against real Postgres, every row of the Pay flow's failure table, and races (twenty Sends at once give one link; fifty Pays at once give one charge).
-- **55 browser tests** (Playwright): every user flow, axe on every page and pay-page state, keyboard-only runs, 320px-wide screens, and contrast themes.
+- **351 unit, integration and property tests** (Vitest): golden money cases, property tests over thousands of random prices, every database rule against real Postgres, every row of the Pay flow's failure table, and races (twenty Sends at once give one link; fifty Pays at once give one charge).
+- **60 browser tests** (Playwright): every user flow, axe on every page and pay-page state, keyboard-only runs, 320px-wide screens, and contrast themes.
 
 These two counts are checked against a fresh run by `npm run verify`, so they can't go stale.
 
@@ -110,7 +110,7 @@ Reconciliation is clean after every run.
 
 ## Decisions, cuts and AI use
 
-- **[Decisions](docs/DECISIONS.md)**: 79 decisions, each with why and its trade-off, plus the assumptions. The biggest: integer cents with the fee rounded up per item (D17); save the payment attempt before charging (D21); one live payment per order, enforced by the database (D22); never tell a patient "declined" unless the payment company said so (D23); signed pay links instead of stored tokens (D25); one app server and one database (D20).
+- **[Decisions](docs/DECISIONS.md)**: 83 decisions, each with why and its trade-off, plus the assumptions. The biggest: integer cents with the fee rounded up per item (D17); save the payment attempt before charging (D21); one live payment per order, enforced by the database (D22); never tell a patient "declined" unless the payment company said so (D23); signed pay links instead of stored tokens (D25); one app server and one database (D20).
 - **[Cut, and what's next](docs/DECISIONS.md#cut-and-whats-next)**: refunds, real payments and payouts, tax, shipping, stock, recurring orders, patient verification, dark mode, and the scaling steps past Level 1, each with the next step.
 - **[AI usage](docs/AI_USAGE.md)**: built with Claude Code, with the places the AI misled us and how each was caught. Among them: a money rule written into the plan without being checked; database rules that let NULLs through; a link-signing helper that would have been callable from the browser; and a page that only broke at phone width.
 

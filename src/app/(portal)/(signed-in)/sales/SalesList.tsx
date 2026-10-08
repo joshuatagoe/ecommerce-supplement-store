@@ -1,8 +1,9 @@
 "use client";
 
-// F4: the order list with search, each status's action, a count that's
-// announced, the footer of paid orders in view, and paging. Search text stays
-// in this component and the request body; it never reaches the URL (§8).
+// F4: the summary of the view, then the order list with search, each status's
+// action, a count that's announced, and numbered pages (L5). Search text stays
+// in this component and the request body; it never reaches the URL (§8), so
+// while a search is on, its pages are buttons rather than links.
 import Link from "next/link";
 import { type FormEvent, useState, useTransition } from "react";
 import { Button } from "react-aria-components";
@@ -17,11 +18,28 @@ import { searchOrdersAction } from "./actions";
 import type { SalesPage, SalesRowView } from "./links";
 import styles from "./sales.module.css";
 
-type Props = { filters: SalesFilters; filtered: boolean; initial: SalesPage; timeZone: string };
+type Props = {
+  filters: SalesFilters;
+  filtered: boolean;
+  initial: SalesPage;
+  timeZone: string;
+  /** What the filters select, in words: a shortcut's name, "Your filters" or "All orders". */
+  view: string;
+  productName: string | null;
+  /** The filters as a query string, for the page links. */
+  pageQuery: string;
+};
 
 const DATE_LABEL = { created: "Created", sent: "Sent", paid: "Paid" } as const;
 
-export function SalesList({ filters, filtered, initial, timeZone }: Props) {
+/** Page numbers to offer: all of them when few, else the ends and the neighbours of the current one. */
+function pageNumbers(current: number, last: number): (number | "gap")[] {
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+  const shown = [...new Set([1, current - 1, current, current + 1, last])].filter((n) => n >= 1 && n <= last).sort((a, b) => a - b);
+  return shown.flatMap((n, i) => (i > 0 && n - shown[i - 1] > 1 ? ["gap" as const, n] : [n]));
+}
+
+export function SalesList({ filters, filtered, initial, timeZone, view, productName, pageQuery }: Props) {
   const [text, setText] = useState("");
   const [searched, setSearched] = useState("");
   const [page, setPage] = useState(initial);
@@ -33,7 +51,7 @@ export function SalesList({ filters, filtered, initial, timeZone }: Props) {
     event.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await searchOrdersAction({ ...filters, text: text.trim() || undefined });
+      const result = await searchOrdersAction({ ...filters, text: text.trim() || undefined, page: undefined });
       if (result.ok) {
         setPage(result.page);
         setSearched(text.trim());
@@ -43,10 +61,11 @@ export function SalesList({ filters, filtered, initial, timeZone }: Props) {
     });
   }
 
-  function more() {
+  /** A page of search results; the filters' own pages are links instead. */
+  function goTo(number: number) {
     startTransition(async () => {
-      const result = await searchOrdersAction({ ...filters, text: searched || undefined, cursor: page.nextCursor ?? undefined });
-      if (result.ok) setPage((current) => ({ ...result.page, rows: [...current.rows, ...result.page.rows] }));
+      const result = await searchOrdersAction({ ...filters, text: searched || undefined, page: number });
+      if (result.ok) setPage(result.page);
     });
   }
 
@@ -67,8 +86,61 @@ export function SalesList({ filters, filtered, initial, timeZone }: Props) {
   const nothingYet = page.count === 0 && !filtered && !searched;
   const dateOf = (row: SalesRowView) =>
     ({ created: row.createdAt, sent: row.sentAt, paid: row.paidAt })[filters.dateField];
+  const firstShown = (page.page - 1) * page.pageSize + 1;
+  const pageHref = (number: number) => `/sales?${pageQuery ? `${pageQuery}&` : ""}page=${number}#orders-heading`;
 
   return (
+    <>
+      <section aria-labelledby="summary-heading" className={styles.summary}>
+        <h2 id="summary-heading">Summary</h2>
+        <p className={styles.view} data-testid="summary-view">
+          {view}
+          {searched ? ", matching your search" : ""}
+        </p>
+        <dl>
+          <div>
+            <dt>Orders</dt>
+            <dd data-testid="summary-orders">{page.count}</dd>
+          </div>
+          <div>
+            <dt>Paid orders</dt>
+            <dd data-testid="summary-paid">{page.paid.count}</dd>
+          </div>
+          <div>
+            <dt>Sales</dt>
+            <dd data-testid="summary-sales">{formatCents(page.paid.totalCents)}</dd>
+          </div>
+          <div>
+            <dt>You earned</dt>
+            <dd data-testid="summary-earned">{formatCents(page.paid.marginCents)}</dd>
+          </div>
+          <div>
+            <dt>Fees</dt>
+            <dd>{formatCents(page.paid.feeCents)}</dd>
+          </div>
+        </dl>
+        {page.product && (
+          <>
+            <h3 className={styles.productHeading}>{productName ?? "This product"} in those paid orders</h3>
+            <dl>
+              <div>
+                <dt>Bottles sold</dt>
+                <dd data-testid="summary-bottles">{page.product.bottles}</dd>
+              </div>
+              <div>
+                <dt>Sales</dt>
+                <dd>{formatCents(page.product.totalCents)}</dd>
+              </div>
+              <div>
+                <dt>You earned</dt>
+                <dd>{formatCents(page.product.marginCents)}</dd>
+              </div>
+            </dl>
+          </>
+        )}
+        <p className={styles.muted}>Sales, earnings and fees count paid orders only. Dates are in your practice&apos;s time zone.</p>
+      </section>
+
     <section aria-labelledby="orders-heading" className={styles.orders}>
       <h2 id="orders-heading">Orders</h2>
       <form role="search" onSubmit={search} className={styles.search}>
@@ -223,19 +295,67 @@ export function SalesList({ filters, filtered, initial, timeZone }: Props) {
               </tbody>
             </table>
           </div>
-          {page.nextCursor && (
-            <Button className="button" isDisabled={pending} onPress={more}>
-              Show more orders
-            </Button>
-          )}
+          <nav aria-label="Pages" className={styles.pager}>
+            <p>
+              {firstShown}–{firstShown + page.rows.length - 1} of {page.count}
+            </p>
+            {page.pageCount > 1 && (
+              <ul>
+                {page.page > 1 && (
+                  <li>
+                    {searched ? (
+                      <Button className="button" isDisabled={pending} onPress={() => goTo(page.page - 1)}>
+                        Previous
+                      </Button>
+                    ) : (
+                      <Link className="button" href={pageHref(page.page - 1)}>
+                        Previous
+                      </Link>
+                    )}
+                  </li>
+                )}
+                {pageNumbers(page.page, page.pageCount).map((number, i) =>
+                  number === "gap" ? (
+                    <li key={`gap-${i}`} aria-hidden="true">
+                      …
+                    </li>
+                  ) : (
+                    <li key={number}>
+                      {number === page.page ? (
+                        <span className={styles.current} aria-current="page">
+                          {number}
+                        </span>
+                      ) : searched ? (
+                        <Button className="button" aria-label={`Page ${number}`} isDisabled={pending} onPress={() => goTo(number)}>
+                          {number}
+                        </Button>
+                      ) : (
+                        <Link className="button" aria-label={`Page ${number}`} href={pageHref(number)}>
+                          {number}
+                        </Link>
+                      )}
+                    </li>
+                  ),
+                )}
+                {page.page < page.pageCount && (
+                  <li>
+                    {searched ? (
+                      <Button className="button" isDisabled={pending} onPress={() => goTo(page.page + 1)}>
+                        Next
+                      </Button>
+                    ) : (
+                      <Link className="button" href={pageHref(page.page + 1)}>
+                        Next
+                      </Link>
+                    )}
+                  </li>
+                )}
+              </ul>
+            )}
+          </nav>
         </>
       )}
-
-      <p className={styles.footer} data-testid="footer-totals">
-        {page.footerTotals.count === 0
-          ? "No paid orders in this view."
-          : `Paid orders in this view: ${page.footerTotals.count} · ${formatCents(page.footerTotals.totalCents)} · earned ${formatCents(page.footerTotals.marginCents)} · fees ${formatCents(page.footerTotals.feeCents)}`}
-      </p>
     </section>
+    </>
   );
 }

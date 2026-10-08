@@ -520,7 +520,7 @@ Every write below happens in **one transaction**. "Access" means the provider's 
 | **Pay** | token, Pay key, card | [§5](#5-the-pay-flow) | attempt, order, events, NOTIFY | An outcome |
 | Status stream | token | Access → LISTEN | — | SSE events |
 | Sweep | — | Payments → `PaymentGateway.lookup` → Orders | attempt, order, events, NOTIFY | — |
-| Sales | filters | Access → Reporting | — | Rows, headline totals, and footer totals |
+| Sales | filters, page | Access → Reporting | — | A page of rows, the view's summary, and a chosen product's totals |
 | Order details | ref | Access → Reporting | — | Lines with their split, totals, and the audit trail |
 | Reconcile, seed, sweep (commands) | — | Reporting; Store, Orders and Payments with the clock set back | seed: everything | A report |
 
@@ -541,7 +541,7 @@ Server actions return `{ ok: true, … }` or `{ ok: false, error: { code, messag
 | `sendOrder` | `ref` | `{ link, expiresAt }`. If the order is already sent, returns the same link. | `ORDER_EMPTY`, `LINES_OUT_OF_RANGE` with `lines: [{ catalogItemId, code, message }]`, where a line's code is a price code or `ITEM_NOT_IN_STORE` |
 | `newLink` | `ref` | `{ link, expiresAt }` | `PAYMENT_IN_PROGRESS`, `ORDER_NOT_SENT` |
 | `cancelOrder` | `ref` | `{ status: 'cancelled' }` | `PAYMENT_IN_PROGRESS`, `ORDER_FINAL` |
-| `searchOrders` | `text?`, `status?`, `dateField` (`created`, `sent` or `paid`; `created` if left out), `from?`, `to?` (`YYYY-MM-DD`), `cursor?` | `{ rows, footerTotals, nextCursor }` | — |
+| `searchOrders` | `text?`, `status?`, `dateField` (`created`, `sent` or `paid`; `created` if left out), `from?`, `to?` (`YYYY-MM-DD`), `product?` (a catalog item ID), `page?` (from 1) | `{ rows, count, page, pageCount, pageSize, paid, product }` | — |
 
 **Patient** (no login; the link signature is the credential):
 
@@ -573,9 +573,10 @@ One list shows every order the provider has created (D31):
 
 - **Search** by patient name (any part of the full name) or order ref (its start). The search text is sent in the request body, never in the URL or the logs, because clinic computers are shared.
 - **Filters:** status, and a date range on **created, sent or paid** date, in the practice's time zone. These can live in the URL.
-- **Order and paging:** newest first by the chosen date, with orders that don't have it yet last; 25 at a time, with "Show more orders" (D64). The result count is announced ("12 orders").
-- **Headline totals:** this month so far, **by paid date in the practice's time zone**, ignoring filters. October means paid in October.
-- **A footer row adds up the paid orders in the view:** every paid order matching the filters and search, including any not yet shown (D63). "Paid orders in this view: 1 · $36.00 · earned $15.73 · fees $0.27." When none are paid it says "No paid orders in this view."
+- **Shortcuts:** Paid this month, Paid last month, Last 90 days, Waiting for payment and Drafts each set ordinary filters in one click, with dates in the practice's time zone, and the one that's on is marked (D80). They're plain links that load the page fresh.
+- **Product filter:** the orders that include a product. An order can hold several products, so the list is filtered, not sorted, by product (D82).
+- **Order and paging:** newest first by the chosen date, with orders that don't have it yet last; numbered pages of 25, with the page in the URL so Back and shared links work, and a page past the end shows the last page (D81). While a search is on, its pages are buttons, since search text never goes in the URL. The result count is announced ("12 orders").
+- **The summary at the top describes the view:** orders, paid orders, sales, earnings and fees for every order the filters and search select, not only the 25 on screen (D80). With a product chosen, it adds that product's own bottles sold, sales and earnings in those paid orders, from the split frozen at Send (D82). It replaces the "this month" headline totals and the footer row (D63).
 - **Platform-wide totals use UTC.** An order paid at 10pm Pacific on October 31 counts as October in Dr. Rivera's Sales but as November in the platform totals, so the two don't add up month by month.
 
 ## 9. Frontend
@@ -592,7 +593,7 @@ flowchart TB
 
 | Page | Shows | Actions |
 |---|---|---|
-| **Sales** (home) | Headline totals, then the order list with search, filters, and a footer row | The action for each status |
+| **Sales** (home) | Shortcuts and filters, a summary of the view, then the orders in numbered pages, with search (D80–D82) | The action for each status |
 | **New order** | Patient picker, with Recent patients under it before any typing (D79). Once a patient is chosen, that patient's recent orders with Order again, and Start order. Choosing a patient creates nothing; Start order or Order again creates the draft, which opens at `orders/[ref]` (D56). Then lines with quantity, price or margin, "You earn" with the cost and fee it comes after, No profit and Max profit, saving against retail, and totals. | Send, then "Sent to Sam" with Copy link |
 | **Order details** | Each line's price, cost, fee and margin; totals; fee rate; times; the audit trail | Copy link, New link, Order again, Cancel order |
 | **My store** | The catalog with cost, lowest price and retail price, plus the provider's items with usual prices | Add, remove, set the usual price, No profit, Max profit |
@@ -604,6 +605,18 @@ flowchart TB
 - **The status words come only from `src/shared/status.ts`, and only `StatusBadge` shows them.** Each word is paired with an icon and is never shown by colour alone. The same file works out Expired, the Sales actions and the pay-page state.
 - **Autosave never re-renders the field being typed in.** It shows "Saving…", "Saved", or "Not saved, retrying".
 - **Hard widgets use React Aria Components:** the patient picker combobox, the Cancel order dialog, the price-or-margin radio group, and the quantity field.
+
+### UX at scale
+
+Each list that grows with use, what the slice does, and the next step (L5). By §2's numbers a provider sends about 5 orders a month, so most lists stay short for years. A busy provider, a practice-wide view or a real supplier's catalog does not.
+
+| Screen | Grows with | In the slice | Next step |
+|---|---|---|---|
+| Sales | The provider's orders | Shortcuts, filters and a product filter; a summary of the view at the top; numbered pages of 25 in the URL (D80–D82) | Keyset paging on the date index once offsets slow down; saved views if providers ask for them |
+| My store: the catalog | Our catalog: 8 products seeded, thousands for a real supplier | A search box over the list the page holds (D83) | Search on the server with paging, plus filters by brand or category |
+| A draft's Add list | The provider's store | A search box (D83) | Recently ordered items first |
+| New order: patients | The practice's patients, thousands in an EHR | Recent patients, plus search with the top 10 (D79) | Nothing yet |
+| Order details and the pay page | One order | Bounded | Nothing needed |
 
 ### Visual design: tokens and patterns
 
