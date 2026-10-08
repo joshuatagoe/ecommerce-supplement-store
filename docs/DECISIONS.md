@@ -111,6 +111,7 @@ Status is **Accepted** (agreed with the user), **Proposed** (awaiting the user),
 |---|---|---|
 | Refunds | Out of scope for the slice (user decision) | Reverse the split. The provider's margin is clawed back. Stripe keeps its processing fee on refunds. |
 | Monitoring and alerts | No real users, so nothing to alert anyone about (user decision, D85) | Error tracking, alerts on stuck payments and failed reconciles, log shipping with dashboards, and request tracing: ARCHITECTURE §11, "In production". |
+| Emailed receipts | Noticed after the build and left out by the user: the pay page shows a receipt after payment (order, date, total and items), and email is stubbed (D58) | Email a receipt after each payment through the same outbox as the pay link. Once saved cards charge on a schedule, the card networks require a receipt for every charge (ARCHITECTURE §18). |
 | Automatic repeat orders (autoship) | The PRD's requirements cover a single order. The slice has Order again (D31) but no schedule. | Designed in ARCHITECTURE §18 (D86): a dose the provider sets, a supply clock that starts at shipping, a pay link 14 days before the supply runs out, a number of repeats, and a saved card later. |
 | Patient browsing | Out of scope (PRD) | Let patients browse the provider's store, limited to items the provider allows. |
 | Shipping charge | Out of scope (PRD) | Patient pays shipping below a threshold, with free shipping above about $50. Our estimate: a $0-margin order breaks even at about $46 when we pay shipping. |
