@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { seededPatients } from "@/server/adapters/seeded-patients";
+import { requestId } from "@/app/request-id";
 import { ordersContext } from "@/server/context";
 import { db } from "@/server/db/client";
 import { recentOrders, startOrder } from "@/server/orders";
@@ -24,7 +25,7 @@ export async function recentOrdersAction(input: unknown): Promise<ActionResult<{
   const provider = await requireProvider();
   const parsed = parseInput(z.object({ patientId: z.uuid() }), input);
   if (!parsed.ok) return parsed;
-  return { ok: true, orders: await recentOrders(ordersContext(), provider, parsed.data.patientId) };
+  return { ok: true, orders: await recentOrders(ordersContext(await requestId()), provider, parsed.data.patientId) };
 }
 
 /** §8 startOrder, for a patient or from a past order; on success, opens the draft. */
@@ -32,7 +33,7 @@ export async function startOrderAction(input: unknown): Promise<ActionResult> {
   const provider = await requireProvider();
   const parsed = parseInput(startOrderInput, input);
   if (!parsed.ok) return parsed;
-  const result = await startOrder(ordersContext(), provider, parsed.data);
+  const result = await startOrder(ordersContext(await requestId()), provider, parsed.data);
   if (!result.ok) return result;
   redirect(`/orders/${result.ref}`);
 }

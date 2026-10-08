@@ -26,3 +26,11 @@ test("the health check reports a migrated database", async ({ request }) => {
     milestone: expect.stringMatching(/^(S1|M\d|L\d)$/),
   });
 });
+
+test("every response carries its own request ID, for matching it to the logs (§11, L3)", async ({ request }) => {
+  const first = (await request.get("/sign-in")).headers()["x-request-id"];
+  const second = (await request.get("/api/health")).headers()["x-request-id"];
+  expect(first).toMatch(/^[0-9a-f-]{36}$/);
+  expect(second).toMatch(/^[0-9a-f-]{36}$/);
+  expect(second).not.toBe(first);
+});
