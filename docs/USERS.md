@@ -147,6 +147,7 @@ Things that can go wrong:
 - **Card declined.** A plain message: nothing was charged, try another card. The order stays unpaid.
 - **Double-clicking Pay, or two tabs.** Only one payment can succeed (enforced on the server, not just by disabling the button).
 - **Unclear result** (e.g. timeout, or any failure we can't explain). The patient sees "We're confirming your payment. Don't pay again. This page updates by itself." The order goes to **needs review**, and the page updates on its own once the payment is confirmed (D23, D24). It is never retried automatically as a new charge.
+- **The page can't load** (for example, our database is down). "We couldn't load this page. If you just paid, don't pay again: your payment may still be going through. Reload this page in a moment." It never says "declined" (D73).
 - **Link reopened after payment.** "Already paid", with the receipt.
 - **Cancelled order.** "This order is no longer available. Contact [the practice] if you still need these items."
 - **Link older than 30 days.** "This link has expired. Contact Dr. [name]'s clinic for a new one."

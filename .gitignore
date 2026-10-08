@@ -23,3 +23,6 @@ test-results
 
 # The stub payment company's records (STUB_STORE_PATH)
 .data/
+
+# Load-test run files (M8): the k6 context and raw results
+tests/load/.run/

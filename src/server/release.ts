@@ -2,7 +2,7 @@
 // it, a slice that changes no pages looks the same live as the build before.
 
 /** The latest milestone in this build. Each milestone's commit updates it. */
-export const MILESTONE = "M7";
+export const MILESTONE = "M8";
 
 export type Release = { milestone: string; commit: string | null };
 

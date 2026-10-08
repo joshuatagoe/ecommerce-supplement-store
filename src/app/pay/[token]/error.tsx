@@ -1,15 +1,20 @@
 "use client";
 
-// Anything unexplained during Pay, such as a lost connection or a server
-// error, shows "confirming", never "declined" (D23). Reloading shows the
-// order's real state.
+// Anything unexplained on the pay page: a lost connection, a server error, or
+// the database being down when the link is opened (found in M8's outage
+// drill). The page can't tell whether a payment was just made, so it never
+// says "declined" (D23). It tells someone who just paid not to pay again, and
+// everyone to reload in a moment (D73).
 import styles from "./pay.module.css";
 
 export default function PayError() {
   return (
     <main id="main" className={styles.main}>
-      <h1>We&apos;re confirming your payment</h1>
-      <p className={styles.lede}>Don&apos;t pay again. Reload this page in a moment to see where things stand.</p>
+      <h1>We couldn&apos;t load this page</h1>
+      <p className={styles.lede}>
+        If you just paid, don&apos;t pay again: your payment may still be going through. Reload this page in a moment to
+        see where things stand.
+      </p>
       <button className="button button-primary" onClick={() => window.location.reload()}>
         Reload
       </button>

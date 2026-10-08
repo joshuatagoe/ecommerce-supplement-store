@@ -2,7 +2,7 @@
 
 How the supplement-ordering slice is built: the scale it's built for, the parts and their seams, the order lifecycle, the payment flow, the data model, the frontend, and the order of work. Agreed with the user on 2026-10-06.
 
-What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D70). Status lives on the Notion board in [status-board.md](status-board.md), not here.
+What we're building and why is in [PROBLEM_SPACE.md](PROBLEM_SPACE.md). Users and UX flows (F1–F5) are in [USERS.md](USERS.md). Each decision's trade-off is in [DECISIONS.md](DECISIONS.md) (D1–D73). Status lives on the Notion board in [status-board.md](status-board.md), not here.
 
 Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magnesium Glycinate at **$36.00**. Its retail price (MSRP) is $40.00, and it costs us $20.00. The fee is $0.27 and Dr. Rivera's margin is $15.73.
 
@@ -99,7 +99,7 @@ Fullscript's engineering blog reports 10M web requests a day in 2023, served by 
 
 ### Load tests
 
-All load tests run on the user's laptop, with **k6**. Results go in a report, `docs/LOAD_TESTS.md` (D18).
+All load tests run on the user's laptop, with **k6**. Results are in [LOAD_TESTS.md](LOAD_TESTS.md) (D18, D71): Level 1 passes with 95% of requests within 40 ms, the single app server's CPU is the first thing to slow at Level 2, and the money reconciles at every level and through the outage drill.
 
 Each simulated order makes the requests a real one would:
 - **Provider:** start the order, autosave twice, send.
@@ -312,7 +312,8 @@ The index alone already stops two charges, because the second save is refused be
 | `declined` (the payment company said so) | "Your card was declined. You haven't been charged. Try another card." |
 | `not_charged` (we know nothing was charged, such as a failure before the attempt was saved) | "We couldn't take your payment. You haven't been charged. Please try again in a few minutes." |
 | `in_progress` (another tab) | "We're confirming your payment." |
-| `confirming`, a timeout, a network error, a server error, or an unreadable reply | **"We're confirming your payment. Don't pay again. This page updates by itself."** |
+| `confirming`, or no answer before the timeout | **"We're confirming your payment. Don't pay again. This page updates by itself."** |
+| A network error, a server error, or a page that can't load (such as the database being down) | **"We couldn't load this page. If you just paid, don't pay again: your payment may still be going through. Reload this page in a moment."** It never says "declined" (D73). |
 
 While confirming, the page listens on SSE (`/pay/[token]/events`):
 - **The first event is the current status,** so a reconnect never misses a result.
