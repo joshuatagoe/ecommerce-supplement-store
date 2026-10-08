@@ -25,6 +25,7 @@ Examples use one running order: **Dr. Rivera** sends **Sam** one bottle of Magne
 15. [Repository layout](#15-repository-layout)
 16. [Build order](#16-build-order)
 17. [Known limitations](#17-known-limitations)
+18. [Not built: recurring orders](#18-not-built-recurring-orders)
 
 ## 1. Summary
 
@@ -875,7 +876,69 @@ Each milestone is a vertical slice with a check that proves it. Cards are seeded
 - **The sweep needs an always-on server in production.** It runs from Next.js's `instrumentation.ts`, which is documented for monitoring, not background work.
 - **SSE across several servers needs a direct database connection** for LISTEN. Transaction-mode connection poolers don't support it.
 - **The stub payment company's records are lost when Render restarts the app,** because Render Free has no lasting disk. An attempt pending across a restart is then looked up as "never seen" and failed, even for a card that charged (0101). Demo only; a real payment company keeps its own records.
-- **Unconfirmed: whether Neon suspends while our LISTEN connection is open.** If it doesn't, the database stays awake while the app is up. That still fits Neon's free compute while Render Free sleeps. Checked when M4's SSE is deployed.
+- **The database is awake whenever the app is.** The sweep queries it every 5 seconds while Render runs the app. When Render Free stops the app after 15 idle minutes, every connection closes, the LISTEN one included, and Neon suspends about 5 minutes later. Checked in Neon's console on 2026-10-08: the compute had been idle for 35 minutes after the last visit.
 - **The Level 3 load test measures the laptop more than the design.**
 - **The order counts depend on a $100 average order value,** which isn't published anywhere.
-- **The rest of what's cut is in DECISIONS.md:** refunds, real payments, tax, shipping, stock, automatic repeat orders, dark mode, and patient verification.
+- **The rest of what's cut is in DECISIONS.md:** refunds, real payments, tax, shipping, stock, automatic repeat orders (designed in §18), dark mode, and patient verification.
+
+## 18. Not built: recurring orders
+
+Designed after the build and not built (D86). Supplements are usually an ongoing protocol, but every refill is a new order today: the provider uses Order again and sends a new link, and the patient pays each time. Recurring orders take that repeat work away from the provider. The design follows research into pharmacy refills, supplement subscriptions, and the rules for recurring charges (sources at the end). The running example: Sam takes Magnesium Glycinate, 120 capsules a bottle, 2 a day, which is 60 days of supply.
+
+### How it works
+
+1. **The provider sets it up on the order.** Each line gets a dose ("2 capsules a day"), a **Repeat when it runs out** box, and how many repeats, like a prescription's refills. The provider always chooses the number, with no default: 6 is a year of Magnesium. Days of supply are the servings in the bottles divided by the servings a day: 120 × 1 ÷ 2 = 60.
+2. **The supply clock starts when the order ships,** our version of a pharmacy's fill date. In the slice we'd ship on payment, so Sam's order ships October 8 and runs out December 7. A run that's never paid never moves the clock, just as a pharmacy reverses a fill that's never picked up.
+3. **The next run's pay link goes out 14 days before the supply runs out,** but never before 75% of it should be used: November 23 for Sam. Fourteen days leaves a week for Sam to pay and a week to ship and deliver.
+4. **Each run is an ordinary order, sent automatically.** A daily job makes the order from the schedule, freezes the split at that day's cost and fee, and sends Sam a pay link through the same Send and Pay flow as today. The link follows the same rules as any pay link (§6). The provider does nothing.
+5. **Paying a run restarts the clock** from its ship date, and uses up one repeat.
+
+### The rules
+
+| Rule | What happens | Example |
+|---|---|---|
+| Too soon | Any order with a dose, on a schedule or not, opens a reorder window once 75% of its supply should be used. An order for the same product and patient before then needs a reason from a short list, which goes on the audit trail: dose change, lost or damaged, travel, or lining up shipments. It's a check, not a block. | Sam's reorders open November 22. An order on November 1 asks "Why order early?" |
+| Repeats run out | The provider gets a one-click Renew request. There's no time limit: supplements aren't prescriptions, and no supplement seller expires a schedule. | After Sam's sixth run, Dr. Rivera is asked to renew |
+| An unpaid run | Missed payments never end or pause a schedule. The run stays open and holds the clock, and no second run stacks up behind it. Thirty days after the supply should have run out, the provider is told the patient may have stopped taking it; nothing is cancelled. | Sam's run is still unpaid on January 6, so Dr. Rivera hears about it |
+| The patient's say | The run's pay page lets the patient skip this run or stop repeats, and the provider is told. The provider started the schedule, so the patient needs a way out. | Sam stops repeats from his phone |
+| Price | A run uses the last price. If that price is no longer allowed, the run waits and the provider is asked to set a new one. No discount for repeating. | Retail drops to $34.00, so $36.00 is above retail |
+| Different clocks | Each product keeps its own schedule; products due in the same week go in one order, so the patient gets one link | Omega lasts 30 days and Magnesium 60, so every other Omega order includes Magnesium |
+| Declined card | Nothing new: the run is an ordinary sent order, and the patient can pay with another card | |
+
+### Data
+
+| Change | Holds |
+|---|---|
+| `catalog_items.servings_per_container` and `serving_unit` | 120 and "capsule", or 1,200 and "drop". Today there's only the label "120 capsules". |
+| `order_lines.servings_per_day` | The dose, frozen with the line at Send |
+| `order_events` kind `ordered_early` | The reason when an order comes before the reorder window opens |
+| `repeat_schedules` | Provider, patient, product, quantity, dose, last price, repeats left, next due date, and status (active, ended) with why it ended |
+| `schedule_runs` | One row per run: the schedule, the due date and the order it made. Unique on schedule and due date, so a run is never made twice, even if the job runs twice. |
+
+The job runs on the sweep's timer and holds an advisory lock, so only one server runs it (§2). Audit events record each run, renewal, early order and ending. `npm run metrics` counts scheduled runs as repeat orders, along with Order again.
+
+### Later
+
+- **A saved card charged automatically.** Charging on a schedule brings duties a pay link per run doesn't seem to: the patient's recorded consent, a yearly reminder, cancelling online in one step, a receipt for every charge, and about two weeks of retries after a failed charge before pausing (ROSCA, California's automatic-renewal law, and Visa's and Mastercard's rules for stored cards). That a pay link falls outside them is our reading of the definitions, not something a source confirms.
+- **Open questions:** doses that change over time, and liquids or powders measured by the scoop.
+
+### If we built it
+
+| Step | Delivers |
+|---|---|
+| R1 | Servings on catalog items, a dose on order lines, days of supply on the line, and the too-soon check with its reasons |
+| R2 | Schedules with repeats, the daily job and automatic Send, runs grouped by week, and Renew |
+| R3 | Skip and stop on the pay page, the notice to the provider 30 days after an unpaid run-out, and schedules shown in Sales and Order details |
+| R4 | Saved cards, only with the duties above |
+
+### Where the numbers come from
+
+| Decision | Source |
+|---|---|
+| The clock starts at the fill date; an unpicked fill is reversed after 14 days; early-refill reasons (vacation, lost or damaged, dose change) | [CVS Caremark provider manual 2026](https://www.caremark.com/content/dam/enterprise/caremark/pdfs/pharmacists-and-medical-professionals/2026_caremark_provider_manual.pdf) |
+| Refills allowed from 75–80% of the supply used | [Medi-Cal Rx early-refill policy](https://medi-calrx.dhcs.ca.gov/cms/medicalrx/static-assets/documents/provider/2026/07_A_30-Day_Countdown_Updates_Early_Refill_Policy.pdf), [Medicaid DUR summary](https://www.medicaid.gov/medicaid/prescription-drugs/downloads/2023-dur-mcp-summary-report.pdf) |
+| The prescriber is asked to renew when refills run out | [CVS ReadyFill](https://www.cvs.com/content/refill), [Express Scripts automatic refills](https://www.express-scripts.com/frequently-asked-questions/automatic-refills) |
+| Supplement schedules run until cancelled, and no seller blocks an early order | [Fullscript Autoship terms](https://fullscript.com/legal/autoship-terms), [Fullscript refill reminders](https://support.fullscript.com/articles/refill-reminders) |
+| A 30-day gap is commonly read as "stopped", and programs tell a person rather than cancel; 80% of days covered counts as taking it | [Refill-gap study](https://pmc.ncbi.nlm.nih.gov/articles/PMC3160417/), [PDC](https://docstation.co/blog/pdc-pharmacy) |
+| Mail-order lead times (10 days' notice, 7–10 business days to deliver) | [Express Scripts](https://www.express-scripts.com/frequently-asked-questions/automatic-refills), [USPS Ground Advantage](https://www.usps.com/ship/ground-advantage.htm) |
+| Duties for charging a saved card | [ROSCA](https://www.law.cornell.edu/uscode/text/15/8403), [California automatic renewal](https://california.public.law/codes/business_and_professions_code_section_17602), [Stripe smart retries](https://docs.stripe.com/billing/revenue-recovery/smart-retries) |
