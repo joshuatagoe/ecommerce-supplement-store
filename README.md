@@ -67,7 +67,6 @@ npm run dev        # then open http://localhost:3000
 | `npm run metrics` | The PRD's numbers by month (below) |
 | `npm run smoke` | Checks the live site: health for this commit, sign-in, and a pay link (read only) |
 | `npm run load:l1` (also `load:race`, `load:l2`, `load:l3`, `drill:outage`) | The k6 load tests, after `npm run build` |
-| `npm run demo` | Drives the demo in a visible, slowed-down browser |
 
 ## Tests
 
@@ -111,7 +110,7 @@ Reconciliation is clean after every run.
 
 ## Decisions, cuts and AI use
 
-- **[Decisions](docs/DECISIONS.md)**: 87 decisions, each with why and its trade-off, plus the assumptions. The biggest: integer cents with the fee rounded up per item (D17); save the payment attempt before charging (D21); one live payment per order, enforced by the database (D22); never tell a patient "declined" unless the payment company said so (D23); signed pay links instead of stored tokens (D25); one app server and one database (D20).
+- **[Decisions](docs/DECISIONS.md)**: 88 decisions, each with why and its trade-off, plus the assumptions. The biggest: integer cents with the fee rounded up per item (D17); save the payment attempt before charging (D21); one live payment per order, enforced by the database (D22); never tell a patient "declined" unless the payment company said so (D23); signed pay links instead of stored tokens (D25); one app server and one database (D20).
 - **[Cut, and what's next](docs/DECISIONS.md#cut-and-whats-next)**: refunds, real payments and payouts, tax, shipping, stock, recurring orders (designed, not built), emailed receipts, patient verification, dark mode, and the scaling steps past Level 1, each with the next step.
 - **[AI usage](docs/AI_USAGE.md)**: built with Claude Code, with the places the AI misled us and how each was caught. Among them: a money rule written into the plan without being checked; database rules that let NULLs through; a link-signing helper that would have been callable from the browser; and a page that only broke at phone width.
 

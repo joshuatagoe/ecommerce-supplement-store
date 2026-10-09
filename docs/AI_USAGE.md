@@ -276,3 +276,9 @@ How AI was used on this project: tools, what worked, where it misled us, and how
 ### Where AI misled us or we course-corrected
 
 51. **The AI's checkout line "This link works until Jan 6" was wrong for part of that day.** A link expires at the time of day it was sent, so a link sent at 3 PM stopped working at 3 PM on January 6, while the page promised the whole day. The user asked for a review of the L7 commit, and the review found it, along with two refusals the code handled but no test proved. The patient now sees the last full day ("works through Jan 5"), the provider sees the exact time, and both refusals have tests.
+
+## 2026-10-08 — The demo video
+
+### Where AI misled us or we course-corrected
+
+52. **The AI's demo script assumed New link stayed on the Sales page.** It redirects to the order's own page. In a fast run the next click happened before the redirect landed, so the script passed; at recording speed it waited for ever for a Sales button, and the user's first take stalled halfway. Rerunning the scene at recording speed found it, and every step got a 30-second limit so a wrong step fails instead of hanging (D88).

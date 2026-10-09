@@ -778,7 +778,7 @@ The alternatives each lack something:
 | **Property tests** (fast-check) | For thousands of random prices and costs: the parts always add up, the margin is never negative at or above the lowest price, the fee always rounds up, and entering a margin lands exactly on it, at the lowest such price |
 | **Integration tests** (real Postgres) | Each database rule refuses bad data. Every row of the Pay "breaks" table behaves as designed. The race test charges exactly once. The sweep settles each test-card outcome. Cancel and Pay at the same moment never leave a paid cancelled order. |
 | **End-to-end** (Playwright) | Each run starts by rebuilding the seed (`seed --reset` on the local app database), and the specs run one at a time, because they share it. The provider builds and sends an order, then the patient pays. axe runs on every page and every pay-page state. A **keyboard-only** run completes the flow. Accessibility-tree snapshots cover the pay-page states. Runs are emulated under a contrast theme and at 320px wide. |
-| **Manual** | One NVDA screen-reader pass on the pay flow, recorded in the report |
+| **Manual** | One NVDA screen-reader pass on the pay flow. Done by the user on 2026-10-08 with NVDA, following the pay-flow steps: nothing seemed out of the ordinary. NVDA reads more than the screen shows (each control's type, state and hint), which is how it should work. |
 | **Load and drill** | [§2](#load-tests) |
 
 ### Check layers
@@ -843,7 +843,7 @@ src/
 src/instrumentation.ts  starts the sweep (Node runtime only; Next.js wants it inside src/ when src/ exists)
 drizzle/                SQL migrations (committed)
 scripts/                setup, migrate, verify, push, check-skills, check-readme, seed, reconcile, metrics, smoke, load (k6 runs and the drill)
-tests/                  golden/, unit/, integration/, e2e/, load/ (k6), demo/ (the video script)
+tests/                  golden/, unit/, integration/, e2e/, load/ (k6)
 docs/                   this doc, design/palettes.html, LOAD_TESTS.md
 docker-compose.yml
 ```

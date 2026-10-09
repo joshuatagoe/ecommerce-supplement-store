@@ -18,7 +18,6 @@
     "reconcile": "node --env-file-if-exists=.env scripts/reconcile.ts",
     "metrics": "node --env-file-if-exists=.env scripts/metrics.ts",
     "smoke": "node scripts/smoke.ts",
-    "demo": "playwright test --config playwright.demo.config.ts",
     "load:race": "node scripts/load.ts race",
     "load:l1": "node scripts/load.ts l1",
     "load:l2": "node scripts/load.ts l2",

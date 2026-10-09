@@ -29,3 +29,7 @@ tests/load/.run/
 
 # Test reports written by verify (the README check reads the count)
 tests/.results/
+
+# The demo video's recording script stays on the developer's machine (D88)
+tests/demo/
+playwright.demo.config.ts
