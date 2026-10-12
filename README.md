@@ -4,8 +4,10 @@ A clinician builds a supplement order for a patient and sends a link; the patien
 
 **Live demo: https://ecommerce-supplement-store-qywu.onrender.com** — a demo, not a real store, and hidden from search engines. It runs on free hosting that sleeps after 15 idle minutes, so **the first visit can take about a minute to wake up.**
 
+**Demo video: https://www.youtube.com/watch?v=rQrVBABCWc0**
+
 [![CI](https://github.com/joshuatagoe/ecommerce-supplement-store/actions/workflows/ci.yml/badge.svg)](https://github.com/joshuatagoe/ecommerce-supplement-store/actions/workflows/ci.yml)
-CI runs on GitHub only; the repo is mirrored to GitLab. [All CI runs](https://github.com/joshuatagoe/ecommerce-supplement-store/actions).
+CI runs on GitHub only; the repo is mirrored to [GitLab](https://labs.gauntletai.com/calebtagoe/ecommerce-supplement-store). [All CI runs](https://github.com/joshuatagoe/ecommerce-supplement-store/actions).
 
 ## Try it
 
